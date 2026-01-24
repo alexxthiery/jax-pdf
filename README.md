@@ -21,4 +21,4 @@ samples = banana.sample(key, 1000)
 
 ## Documentation
 
-Full documentation at: https://alekthiery.github.io/jax-pdf/
+Full documentation at: https://alexxthiery.github.io/jax-pdf/

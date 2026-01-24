@@ -17,7 +17,7 @@ pip install jax-pdf
 Or install from source:
 
 ```bash
-pip install git+https://github.com/alekthiery/jax-pdf.git
+pip install git+https://github.com/alexxthiery/jax-pdf.git
 ```
 
 ## Quick Example

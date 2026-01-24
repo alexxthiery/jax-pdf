@@ -1,6 +1,6 @@
 site_name: jax-pdf
 site_description: Probability density functions for MCMC/VI testing
-repo_url: https://github.com/alekthiery/jax-pdf
+repo_url: https://github.com/alexxthiery/jax-pdf
 
 theme:
   name: material
