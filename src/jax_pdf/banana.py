@@ -22,13 +22,6 @@ class Banana2D:
             (e.g., 0.01) create a thin, tightly curved banana that is
             challenging for MCMC. Larger values (e.g., 1.0) create a
             fatter, easier distribution. Default: 0.1.
-
-    Example:
-        >>> dist = Banana2D(sigma=0.1)
-        >>> x = jnp.array([1.0, 1.0])
-        >>> dist(x)                      # log prob
-        >>> dist.sample(key, 100)        # 100 samples
-        >>> jax.grad(dist)(x)            # gradient
     """
 
     sigma: float = 0.1
