@@ -15,6 +15,7 @@ plugins:
           options:
             show_source: false
             docstring_style: google
+            docstring_section_style: spacy
 
 markdown_extensions:
   - pymdownx.arithmatex:

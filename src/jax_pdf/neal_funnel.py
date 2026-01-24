@@ -23,13 +23,6 @@ class NealFunnel:
         sigma: Std dev of x0 (the "mouth width" of the funnel). Larger
             values create a wider range of scales, making sampling harder.
             Default: 3.0 (standard benchmark setting).
-
-    Example:
-        >>> dist = NealFunnel(dim=10, sigma=3.0)
-        >>> x = jnp.zeros(10)
-        >>> dist(x)                      # log prob
-        >>> dist.sample(key, 100)        # 100 samples
-        >>> jax.grad(dist)(x)            # gradient
     """
 
     dim: int = 10

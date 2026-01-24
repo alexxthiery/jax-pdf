@@ -81,3 +81,66 @@ samples = funnel.sample(key, 500)
 **Why it's hard:**
 
 The funnel requires adapting to vastly different scales. In the narrow neck ($x_0 < 0$), step sizes must be tiny; in the wide mouth ($x_0 > 0$), they can be large. Standard MCMC with fixed step sizes struggles with this multi-scale geometry.
+
+---
+
+## LGCP (Log Gaussian Cox Process)
+
+A Log Gaussian Cox Process on the Finnish Pines dataset, used as a spatial statistics benchmark.
+
+![MAP Estimate](pictures/log_gaussian_pine_map_estimate.png)
+
+**Mathematical definition:**
+
+The LGCP models spatial point patterns as a Poisson process with log-intensity given by a Gaussian process:
+
+$$
+f \sim \mathcal{GP}(\mu, K), \quad n_i | f \sim \text{Poisson}(A \cdot e^{f_i})
+$$
+
+where $f$ is the latent log-intensity field on a discretized grid, $K$ is an exponential covariance kernel, and $n_i$ are observed counts per cell.
+
+This is an **unnormalized posterior density** used as an MCMC benchmark. The challenging geometry arises from the GP prior correlation structure.
+
+**Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `grid_dim` | 40 | Grid cells per dimension. Total latent dimension is `grid_dim^2`. |
+| `whitened` | False | If True, parameterize in whitened space (easier geometry for HMC). |
+
+**Example:**
+
+```python
+from jax_pdf.log_gauss_pines import LGCP
+import jax
+
+# Create LGCP model
+lgcp = LGCP(grid_dim=40)
+print(f"Dimension: {lgcp.dim}")  # 1600
+
+# Evaluate log probability
+x = jax.numpy.zeros(lgcp.dim)
+log_prob = lgcp(x)
+
+# Compute MAP estimate with optimization trajectory
+result = lgcp.map_estimate()
+x_map = result["x"]
+print(f"Converged in {result['n_iters']} iterations")
+
+# Laplace approximation (Gaussian at MAP)
+laplace = lgcp.laplace_approximation()
+mu = laplace["mu"]
+cov = laplace["cov"]
+```
+
+**Whitened parameterization:**
+
+```python
+# Whitened version (prior becomes standard normal)
+lgcp_white = LGCP(grid_dim=40, whitened=True)
+```
+
+**Why it's hard:**
+
+The GP prior induces strong correlations between neighboring grid cells. Standard samplers struggle with this correlated geometry. The whitened parameterization decorrelates the prior, making HMC more efficient.

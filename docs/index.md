@@ -2,11 +2,7 @@
 
 Probability density functions for MCMC and variational inference testing.
 
-`jax-pdf` provides a collection of standard benchmark distributions used to test sampling algorithms. Each distribution supports:
-
-- Log probability evaluation with automatic differentiation
-- Exact sampling (when analytically possible)
-- Batch evaluation via JAX's vectorization
+`jax-pdf` provides a collection of standard benchmark distributions used to test sampling algorithms. Each distribution is callable and returns log probability, with full support for JAX transformations (grad, vmap, jit).
 
 ## Installation
 
@@ -41,14 +37,3 @@ grad = jax.grad(banana)(x)
 key = jax.random.PRNGKey(0)
 samples = banana.sample(key, 1000)
 ```
-
-## Distribution Interface
-
-All distributions follow the same interface:
-
-| Method | Description |
-|--------|-------------|
-| `__call__(x)` | Log probability density (supports batching) |
-| `sample(key, n)` | Draw `n` exact samples |
-| `log_normalization()` | Log normalizing constant |
-| `dim` | Dimensionality (property) |
