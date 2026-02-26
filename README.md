@@ -1,6 +1,8 @@
 # jax-pdf
 
-Probability density functions for MCMC and variational inference testing.
+Benchmark probability density functions for MCMC and variational inference testing.
+
+Each distribution is callable and returns log probability, with full support for JAX transformations (`grad`, `vmap`, `jit`).
 
 ## Installation
 
@@ -8,17 +10,64 @@ Probability density functions for MCMC and variational inference testing.
 pip install jax-pdf
 ```
 
-## Quick Example
+Or from source:
+
+```bash
+pip install git+https://github.com/alexxthiery/jax-pdf.git
+```
+
+## Unified interface
+
+All distributions share a common core API:
 
 ```python
 import jax
-from jax_pdf import Banana2D, NealFunnel
 
-banana = Banana2D(sigma=0.1)
-key = jax.random.PRNGKey(0)
-samples = banana.sample(key, 1000)
+dist = SomeDistribution(...)
+
+# Log probability: input (..., dim) -> output (...)
+log_p = dist(x)
+
+# Gradient
+grad = jax.grad(dist)(x)
+
+# Dimensionality
+d = dist.dim
+
+# Log normalizing constant
+log_Z = dist.log_normalization()
 ```
 
-## Documentation
+Distributions with known closed-form densities (Banana2D, NealFunnel) also support exact sampling:
 
-Full documentation at: https://alexxthiery.github.io/jax-pdf/
+```python
+samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
+```
+
+LGCP is an unnormalized posterior, so exact sampling is not available.
+
+## Distributions
+
+| Distribution | Dim | Description | Docs |
+|-------------|-----|-------------|------|
+| `Banana2D` | 2 | Banana-shaped (Rosenbrock-like) distribution | [docs/banana.md](docs/banana.md) |
+| `NealFunnel` | configurable | Multi-scale funnel distribution | [docs/neal_funnel.md](docs/neal_funnel.md) |
+| `LGCP` | `grid_dim`$^2$ | Log Gaussian Cox Process on Finnish Pines | [docs/lgcp.md](docs/lgcp.md) |
+
+## API reference
+
+Core methods shared by all distributions:
+
+| Method | Signature | Returns |
+|--------|-----------|---------|
+| `__call__` | `(x: Array) -> Array` | Log probability. Input `(..., dim)`, output `(...)`. |
+| `log_normalization` | `() -> float` | Log normalizing constant. |
+| `dim` | property | Dimensionality (int). |
+
+Banana2D and NealFunnel also provide:
+
+| Method | Signature | Returns |
+|--------|-----------|---------|
+| `sample` | `(key, n: int) -> Array` | `n` exact samples, shape `(n, dim)`. |
+
+LGCP additionally provides `map_estimate()`, `hessian_at(x)`, `laplace_approximation()`, and a `pines_points` property. See [docs/lgcp.md](docs/lgcp.md) for details.
