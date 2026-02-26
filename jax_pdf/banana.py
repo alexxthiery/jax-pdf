@@ -17,6 +17,11 @@ class Banana2D:
     parabola x1 = x0^2. The marginal in x0 is standard normal shifted to
     mean 1, while x1 follows x0^2 with Gaussian noise.
 
+    The curved geometry forces gradient-based samplers to follow the
+    parabola rather than move in straight lines. Smaller sigma creates
+    a thinner banana where the sampler needs very small steps to stay
+    on the ridge.
+
     Attributes:
         sigma: Controls the "thickness" of the banana. Smaller values
             (e.g., 0.01) create a thin, tightly curved banana that is

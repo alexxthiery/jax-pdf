@@ -16,7 +16,10 @@ class NealFunnel:
     The first coordinate x0 controls the scale of all other coordinates.
     When x0 is large, the remaining coordinates spread out; when x0 is
     small (negative), they concentrate near zero. This creates a funnel
-    shape that is notoriously difficult for MCMC.
+    shape that is notoriously difficult for MCMC. In the narrow neck
+    (x0 < 0), step sizes must be tiny; in the wide mouth (x0 > 0),
+    they can be large. Fixed step sizes either waste time in the mouth
+    or diverge in the neck.
 
     Attributes:
         dim: Dimensionality of the distribution. Must be >= 2.

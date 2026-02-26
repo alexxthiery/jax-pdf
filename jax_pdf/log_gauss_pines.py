@@ -11,7 +11,6 @@ from jax import Array
 
 from jax_pdf import cox_process_utils as cp_utils
 
-jax.config.update("jax_enable_x64", True)  # needed for LBFGS optimization
 
 # Load pines data at module level (shared across instances)
 _MODULE_PATH = os.path.dirname(__file__)
@@ -184,6 +183,9 @@ class LGCP:
                 - "n_iters": number of iterations taken
                 - "converged": whether tolerance was reached
         """
+        # L-BFGS needs float64 for convergence
+        jax.config.update("jax_enable_x64", True)
+
         if x0 is None:
             x0 = jnp.zeros(self.dim, dtype=jnp.float64)
 
