@@ -4,7 +4,7 @@ Benchmark probability density functions for MCMC and variational inference testi
 
 ## Quick reference
 
-- **Package:** `jax-pdf` (PyPI) / `jax_pdf` (import)
+- **Package:** `jax_pdf` (import name), `jax-pdf` (package name)
 - **Python:** >=3.9
 - **Core deps:** JAX, Flax (`struct.dataclass`), optax (LGCP optimization)
 - **Build:** hatchling

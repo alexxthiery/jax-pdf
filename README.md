@@ -7,13 +7,9 @@ Each distribution is callable and returns log probability, with full support for
 ## Installation
 
 ```bash
-pip install jax-pdf
-```
-
-Or from source:
-
-```bash
-pip install git+https://github.com/alexxthiery/jax-pdf.git
+git clone https://github.com/alexxthiery/jax-pdf.git
+cd jax-pdf
+pip install -e .
 ```
 
 ## Unified interface
@@ -52,7 +48,7 @@ LGCP is an unnormalized posterior, so exact sampling is not available.
 |-------------|-----|-------------|------|
 | `Banana2D` | 2 | Banana-shaped (Rosenbrock-like) distribution | [docs/banana.md](docs/banana.md) |
 | `NealFunnel` | configurable | Multi-scale funnel distribution | [docs/neal_funnel.md](docs/neal_funnel.md) |
-| `LGCP` | `grid_dim`$^2$ | Log Gaussian Cox Process on Finnish Pines | [docs/lgcp.md](docs/lgcp.md) |
+| `LGCP` | grid_dim^2 | Log Gaussian Cox Process on Finnish Pines | [docs/lgcp.md](docs/lgcp.md) |
 
 ## API reference
 
