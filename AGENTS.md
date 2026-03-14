@@ -27,19 +27,23 @@ pytest tests/test_banana.py -v
 
 ```
 jax_pdf/
-  __init__.py           # re-exports: Banana2D, DoubleWell, NealFunnel, LGCP, MullerBrown, PhiFour
+  __init__.py           # re-exports: Banana2D, DoubleWell, DW4, LGCP, LennardJones, MullerBrown, NealFunnel, PhiFour
   banana.py             # Banana2D distribution
   neal_funnel.py        # NealFunnel distribution
   log_gauss_pines.py    # LGCP distribution
   muller_brown.py       # MullerBrown distribution
   phi_four.py           # PhiFour distribution
   double_well.py        # DoubleWell distribution
+  dw4.py                # DW4 distribution (4-particle double-well)
+  lennard_jones.py      # LennardJones distribution (LJ13, LJ55)
   cox_process_utils.py  # utility functions for LGCP
   finpines.csv          # Finnish pines dataset
 tests/
   test_interface.py     # shared interface tests (parametrized across all dists)
   test_banana.py        # Banana2D-specific tests
   test_double_well.py   # DoubleWell-specific tests
+  test_dw4.py           # DW4-specific tests
+  test_lennard_jones.py # LennardJones-specific tests
   test_neal_funnel.py   # NealFunnel-specific tests
   test_lgcp.py          # LGCP-specific tests
   test_muller_brown.py  # MullerBrown-specific tests
@@ -51,6 +55,8 @@ docs/
   muller_brown.md
   phi_four.md
   double_well.md
+  dw4.md
+  lennard_jones.md
 ```
 
 One file per distribution. `__init__.py` re-exports the public API.
