@@ -34,13 +34,13 @@ d = dist.dim
 log_Z = dist.log_normalization()
 ```
 
-Distributions with known closed-form densities (Banana2D, NealFunnel) also support exact sampling:
+Banana2D, NealFunnel, and DoubleWell support sampling:
 
 ```python
 samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
 ```
 
-LGCP, MullerBrown, and PhiFour are unnormalized: no exact sampling, and `log_normalization()` raises `NotImplementedError`.
+LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normalization()` raises `NotImplementedError`.
 
 ## Distributions
 
@@ -51,6 +51,7 @@ LGCP, MullerBrown, and PhiFour are unnormalized: no exact sampling, and `log_nor
 | `LGCP` | grid_dim^2 | Log Gaussian Cox Process on Finnish Pines | [docs/lgcp.md](docs/lgcp.md) |
 | `MullerBrown` | 2 | Multimodal potential energy surface | [docs/muller_brown.md](docs/muller_brown.md) |
 | `PhiFour` | configurable | 1D lattice field theory with double-well potential | [docs/phi_four.md](docs/phi_four.md) |
+| `DoubleWell` | configurable | Product of 2D double-well pairs ($2^{D/2}$ modes) | [docs/double_well.md](docs/double_well.md) |
 
 ## API reference
 
@@ -62,7 +63,7 @@ Core methods shared by all distributions:
 | `log_normalization` | `() -> float` | Log normalizing constant. Raises `NotImplementedError` if intractable. |
 | `dim` | property | Dimensionality (int). |
 
-Banana2D and NealFunnel also provide:
+Banana2D, NealFunnel, and DoubleWell also provide:
 
 | Method | Signature | Returns |
 |--------|-----------|---------|
