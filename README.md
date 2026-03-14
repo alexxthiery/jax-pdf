@@ -40,7 +40,7 @@ Banana2D, NealFunnel, and DoubleWell support sampling:
 samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
 ```
 
-LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normalization()` raises `NotImplementedError`.
+DW4, LennardJones, LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normalization()` raises `NotImplementedError`.
 
 ## Distributions
 
@@ -52,6 +52,8 @@ LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normaliza
 | `MullerBrown` | 2 | Multimodal potential energy surface | [docs/muller_brown.md](docs/muller_brown.md) |
 | `PhiFour` | configurable | 1D lattice field theory with double-well potential | [docs/phi_four.md](docs/phi_four.md) |
 | `DoubleWell` | configurable | Product of 2D double-well pairs ($2^{D/2}$ modes) | [docs/double_well.md](docs/double_well.md) |
+| `DW4` | 8 | Double-well pair potential over 4 particles in 2D | [docs/dw4.md](docs/dw4.md) |
+| `LennardJones` | configurable | Lennard-Jones cluster with harmonic confinement (LJ13, LJ55) | [docs/lennard_jones.md](docs/lennard_jones.md) |
 
 ## API reference
 
