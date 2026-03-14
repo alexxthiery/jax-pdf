@@ -129,6 +129,29 @@ Follow the pattern in `docs/banana.md`: math definition, why it is hard, paramet
 
 Add a row to the distributions table.
 
+## Markdown and math in docs
+
+Documentation must render correctly on GitHub. GitHub uses KaTeX for math, which supports a smaller subset of LaTeX than MathJax.
+
+Rules for math in `.md` files:
+
+- Use `$...$` for inline math and `$$...$$` for display math
+- Blank line before and after `$$` blocks
+- No `\texttt{}`, `\textrm{}`, or other text-mode commands inside math. Use `\text{}` if you need words in math, or better, put the word outside the math delimiters in backticks
+- No escaped underscores (`\_`) inside math. Use raw underscores: `$\phi_i$` not `$\phi\_i$`
+- Do not mix inline code and math on the same token (e.g., `` `grid_dim`$^2$ ``). Use either all-math (`$d^2$`) or Unicode superscripts (`grid_dim²`)
+- Avoid `\mathbb`, `\mathcal` in table cells; they sometimes break. If needed, test on GitHub
+- Pipes `|` inside math in tables conflict with table syntax. Use `\lvert`, `\rvert`, `\mid` instead
+- Test your doc by previewing on GitHub or with `grip` before merging
+
+Common mistakes:
+
+| Bad | Good | Why |
+|-----|------|-----|
+| `$c = a \times \texttt{dim\_grid}$` | `$c = a \cdot d$ where $d$ is \`dim_grid\`` | `\texttt` unsupported in KaTeX |
+| `` `n`$^2$ `` | `n²` or `$n^2$` | Mixed code+math breaks rendering |
+| `$\phi\_i$` | `$\phi_i$` | Escaped underscore breaks math mode |
+
 ## Running tests
 
 ```bash

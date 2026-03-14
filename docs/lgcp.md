@@ -18,7 +18,7 @@ The GP prior induces strong correlations between neighboring grid cells. Standar
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `grid_dim` | `40` | Grid cells per dimension. Total latent dim = `grid_dim`$^2$. |
+| `grid_dim` | `40` | Grid cells per dimension. Total latent dim = `grid_dim`². |
 | `whitened` | `False` | If `True`, parameterize in whitened space (easier geometry for HMC). |
 
 ## Usage

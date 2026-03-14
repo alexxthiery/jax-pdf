@@ -66,6 +66,18 @@ samples = dist.sample(key, n)      # (n, dim) -- Banana2D, NealFunnel only
 - Pure functions, explicit state, no side effects
 - Compatible with `jit`, `vmap`, `grad` without surprises
 
+## Markdown and math
+
+Docs must render on GitHub. GitHub uses KaTeX, not full LaTeX.
+
+- `$...$` for inline math, `$$...$$` for display (blank lines around `$$`)
+- No `\texttt{}`, `\textrm{}` in math. Use `\text{}` or put words outside math in backticks
+- No escaped underscores in math: `$\phi_i$` not `$\phi\_i$`
+- Do not mix inline code and math (e.g., `` `n`$^2$ ``). Use `$n^2$` or Unicode `n²`
+- In tables, use `\lvert`, `\rvert`, `\mid` instead of raw `|` inside math
+
+See CONTRIBUTING.md for the full list and examples.
+
 ## Boundaries
 
 ### Always
