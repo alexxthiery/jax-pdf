@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from jax_pdf import Banana2D, LGCP, NealFunnel
+from jax_pdf import Banana2D, LGCP, MullerBrown, NealFunnel
 
 
 # ---------------------------------------------------------------------------
@@ -15,9 +15,15 @@ ALL_DISTS = [
     Banana2D(sigma=0.1),
     NealFunnel(dim=5, sigma=3.0),
     LGCP(grid_dim=5),
+    MullerBrown(beta=1.0),
 ]
 
 DISTS_WITH_SAMPLE = [
+    Banana2D(sigma=0.1),
+    NealFunnel(dim=5, sigma=3.0),
+]
+
+DISTS_WITH_LOG_NORM = [
     Banana2D(sigma=0.1),
     NealFunnel(dim=5, sigma=3.0),
 ]
@@ -43,16 +49,23 @@ class TestInterface:
         assert lp.shape == (3,)
         assert jnp.all(jnp.isfinite(lp))
 
-    def test_log_normalization_scalar(self, dist):
-        log_z = dist.log_normalization()
-        assert log_z.shape == ()
-        assert jnp.isfinite(log_z)
-
     def test_grad(self, dist):
         x = jnp.zeros(dist.dim)
         g = jax.grad(dist)(x)
         assert g.shape == (dist.dim,)
         assert jnp.all(jnp.isfinite(g))
+
+
+@pytest.mark.parametrize(
+    "dist", DISTS_WITH_LOG_NORM, ids=lambda d: type(d).__name__
+)
+class TestLogNormalization:
+    """Distributions with a computable normalizing constant."""
+
+    def test_log_normalization_scalar(self, dist):
+        log_z = dist.log_normalization()
+        assert log_z.shape == ()
+        assert jnp.isfinite(log_z)
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +144,51 @@ class TestLGCP:
         lgcp_w = LGCP(grid_dim=5, whitened=True)
         assert lgcp.dim == lgcp_w.dim
 
+    def test_log_normalization_raises(self):
+        lgcp = LGCP(grid_dim=5)
+        with pytest.raises(NotImplementedError):
+            lgcp.log_normalization()
+
     def test_no_sample_method(self):
         """LGCP is an unnormalized posterior; no exact sampling."""
         lgcp = LGCP(grid_dim=5)
         assert not hasattr(lgcp, "sample")
+
+
+class TestMullerBrown:
+
+    def test_dim_is_2(self):
+        assert MullerBrown().dim == 2
+
+    def test_beta_validation(self):
+        with pytest.raises(ValueError, match="beta must be positive"):
+            MullerBrown(beta=-1.0)
+        with pytest.raises(ValueError, match="beta must be positive"):
+            MullerBrown(beta=0.0)
+
+    def test_log_normalization_raises(self):
+        mb = MullerBrown()
+        with pytest.raises(NotImplementedError):
+            mb.log_normalization()
+
+    def test_no_sample_method(self):
+        mb = MullerBrown()
+        assert not hasattr(mb, "sample")
+
+    def test_minima_higher_than_saddle(self):
+        """Log-density at minima should exceed the saddle point value."""
+        mb = MullerBrown()
+        # Two deepest minima
+        minima = jnp.array([[-0.558, 1.442], [0.624, 0.028]])
+        # Saddle between them (approximate)
+        saddle = jnp.array([[-0.822, 0.624]])
+        lp_minima = mb(minima)
+        lp_saddle = mb(saddle)
+        assert jnp.all(lp_minima > lp_saddle)
+
+    def test_beta_scales_density(self):
+        """Higher beta should amplify the log-density magnitude."""
+        x = jnp.array([0.624, 0.028])
+        lp1 = MullerBrown(beta=1.0)(x)
+        lp2 = MullerBrown(beta=2.0)(x)
+        assert jnp.allclose(lp2, 2.0 * lp1)

@@ -56,7 +56,11 @@ class MyDist:
         """Log normalizing constant.
 
         Returns:
-            Scalar log(Z). Return 0.0 if the distribution is normalized.
+            Scalar log(Z). Return 0.0 if normalized.
+
+        If the normalizing constant is intractable, raise
+        NotImplementedError. Never return a partial or
+        approximate value.
         """
         ...
 
@@ -77,7 +81,7 @@ Requirements:
 - Use `@struct.dataclass` from Flax (not `@dataclass`)
 - `__call__` returns log probability, supports batch via `x[..., i]`
 - `dim` is a property, not a method
-- `log_normalization()` returns 0.0 for normalized distributions
+- `log_normalization()` returns 0.0 for normalized distributions; raises `NotImplementedError` if intractable
 - `sample()` only if exact sampling is possible; omit otherwise
 - `__post_init__` validates parameters with clear error messages
 - Google-style docstrings with shape annotations
@@ -101,7 +105,9 @@ ALL_DISTS = [
 ]
 ```
 
-This automatically runs all interface tests (dim, call, batch, grad, log_normalization).
+This automatically runs all interface tests (dim, call, batch, grad).
+
+If the distribution has a computable normalizing constant, also add it to `DISTS_WITH_LOG_NORM`.
 
 Add a distribution-specific test class for parameter validation and unique behavior:
 
