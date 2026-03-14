@@ -27,11 +27,12 @@ pytest tests/test_distributions.py::TestBanana2D -v
 
 ```
 jax_pdf/
-  __init__.py           # re-exports: Banana2D, NealFunnel, LGCP, MullerBrown
+  __init__.py           # re-exports: Banana2D, NealFunnel, LGCP, MullerBrown, PhiFour
   banana.py             # Banana2D distribution
   neal_funnel.py        # NealFunnel distribution
   log_gauss_pines.py    # LGCP distribution
   muller_brown.py       # MullerBrown distribution
+  phi_four.py           # PhiFour distribution
   cox_process_utils.py  # utility functions for LGCP
   finpines.csv          # Finnish pines dataset
 tests/
@@ -41,6 +42,7 @@ docs/
   neal_funnel.md
   lgcp.md
   muller_brown.md
+  phi_four.md
 ```
 
 One file per distribution. `__init__.py` re-exports the public API.

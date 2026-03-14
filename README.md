@@ -40,7 +40,7 @@ Distributions with known closed-form densities (Banana2D, NealFunnel) also suppo
 samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
 ```
 
-LGCP and MullerBrown are unnormalized: no exact sampling, and `log_normalization()` raises `NotImplementedError`.
+LGCP, MullerBrown, and PhiFour are unnormalized: no exact sampling, and `log_normalization()` raises `NotImplementedError`.
 
 ## Distributions
 
@@ -50,6 +50,7 @@ LGCP and MullerBrown are unnormalized: no exact sampling, and `log_normalization
 | `NealFunnel` | configurable | Multi-scale funnel distribution | [docs/neal_funnel.md](docs/neal_funnel.md) |
 | `LGCP` | grid_dim^2 | Log Gaussian Cox Process on Finnish Pines | [docs/lgcp.md](docs/lgcp.md) |
 | `MullerBrown` | 2 | Multimodal potential energy surface | [docs/muller_brown.md](docs/muller_brown.md) |
+| `PhiFour` | configurable | 1D lattice field theory with double-well potential | [docs/phi_four.md](docs/phi_four.md) |
 
 ## API reference
 
