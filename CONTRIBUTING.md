@@ -94,9 +94,9 @@ from jax_pdf.<name> import MyDist
 __all__ = [..., "MyDist"]
 ```
 
-### 3. Add tests to `tests/test_distributions.py`
+### 3. Add tests
 
-Add your distribution to `ALL_DISTS` (and `DISTS_WITH_SAMPLE` if it supports sampling):
+Add your distribution to `ALL_DISTS` in `tests/test_interface.py` (and `DISTS_WITH_SAMPLE`, `DISTS_WITH_LOG_NORM` if applicable):
 
 ```python
 ALL_DISTS = [
@@ -105,11 +105,9 @@ ALL_DISTS = [
 ]
 ```
 
-This automatically runs all interface tests (dim, call, batch, grad).
+This automatically runs all shared interface tests (dim, call, batch, grad).
 
-If the distribution has a computable normalizing constant, also add it to `DISTS_WITH_LOG_NORM`.
-
-Add a distribution-specific test class for parameter validation and unique behavior:
+Then create `tests/test_<name>.py` with distribution-specific tests:
 
 ```python
 class TestMyDist:

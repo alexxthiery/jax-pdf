@@ -20,29 +20,37 @@ pip install -e '.[dev]'
 pytest tests/
 
 # Run a single test class
-pytest tests/test_distributions.py::TestBanana2D -v
+pytest tests/test_banana.py -v
 ```
 
 ## Architecture
 
 ```
 jax_pdf/
-  __init__.py           # re-exports: Banana2D, NealFunnel, LGCP, MullerBrown, PhiFour
+  __init__.py           # re-exports: Banana2D, DoubleWell, NealFunnel, LGCP, MullerBrown, PhiFour
   banana.py             # Banana2D distribution
   neal_funnel.py        # NealFunnel distribution
   log_gauss_pines.py    # LGCP distribution
   muller_brown.py       # MullerBrown distribution
   phi_four.py           # PhiFour distribution
+  double_well.py        # DoubleWell distribution
   cox_process_utils.py  # utility functions for LGCP
   finpines.csv          # Finnish pines dataset
 tests/
-  test_distributions.py # parametrized interface + per-distribution tests
+  test_interface.py     # shared interface tests (parametrized across all dists)
+  test_banana.py        # Banana2D-specific tests
+  test_double_well.py   # DoubleWell-specific tests
+  test_neal_funnel.py   # NealFunnel-specific tests
+  test_lgcp.py          # LGCP-specific tests
+  test_muller_brown.py  # MullerBrown-specific tests
+  test_phi_four.py      # PhiFour-specific tests
 docs/
   banana.md             # per-distribution documentation
   neal_funnel.md
   lgcp.md
   muller_brown.md
   phi_four.md
+  double_well.md
 ```
 
 One file per distribution. `__init__.py` re-exports the public API.
@@ -54,7 +62,7 @@ dist = SomeDistribution(param=value)
 log_p = dist(x)                    # input (..., dim) -> output (...)
 dim = dist.dim                     # int property
 log_Z = dist.log_normalization()   # scalar; raises NotImplementedError if intractable
-samples = dist.sample(key, n)      # (n, dim) -- Banana2D, NealFunnel only
+samples = dist.sample(key, n)      # (n, dim) -- Banana2D, DoubleWell, NealFunnel
 ```
 
 ## Code conventions
@@ -84,7 +92,7 @@ See CONTRIBUTING.md for the full list and examples.
 ### Always
 
 - Preserve the unified interface across all distributions
-- Add tests to `tests/test_distributions.py` for new distributions
+- Add to `tests/test_interface.py` and create `tests/test_<name>.py`
 - Update `docs/<name>.md` and the README table when adding distributions
 - Use `@struct.dataclass` (Flax), not plain Python dataclasses
 
