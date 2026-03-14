@@ -40,7 +40,7 @@ Distributions with known closed-form densities (Banana2D, NealFunnel) also suppo
 samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
 ```
 
-LGCP is an unnormalized posterior, so exact sampling is not available.
+LGCP and MullerBrown are unnormalized: no exact sampling, and `log_normalization()` raises `NotImplementedError`.
 
 ## Distributions
 
@@ -49,6 +49,7 @@ LGCP is an unnormalized posterior, so exact sampling is not available.
 | `Banana2D` | 2 | Banana-shaped (Rosenbrock-like) distribution | [docs/banana.md](docs/banana.md) |
 | `NealFunnel` | configurable | Multi-scale funnel distribution | [docs/neal_funnel.md](docs/neal_funnel.md) |
 | `LGCP` | grid_dim^2 | Log Gaussian Cox Process on Finnish Pines | [docs/lgcp.md](docs/lgcp.md) |
+| `MullerBrown` | 2 | Multimodal potential energy surface | [docs/muller_brown.md](docs/muller_brown.md) |
 
 ## API reference
 
@@ -57,7 +58,7 @@ Core methods shared by all distributions:
 | Method | Signature | Returns |
 |--------|-----------|---------|
 | `__call__` | `(x: Array) -> Array` | Log probability. Input `(..., dim)`, output `(...)`. |
-| `log_normalization` | `() -> float` | Log normalizing constant. |
+| `log_normalization` | `() -> float` | Log normalizing constant. Raises `NotImplementedError` if intractable. |
 | `dim` | property | Dimensionality (int). |
 
 Banana2D and NealFunnel also provide:

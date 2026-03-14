@@ -27,10 +27,11 @@ pytest tests/test_distributions.py::TestBanana2D -v
 
 ```
 jax_pdf/
-  __init__.py           # re-exports: Banana2D, NealFunnel, LGCP
+  __init__.py           # re-exports: Banana2D, NealFunnel, LGCP, MullerBrown
   banana.py             # Banana2D distribution
   neal_funnel.py        # NealFunnel distribution
   log_gauss_pines.py    # LGCP distribution
+  muller_brown.py       # MullerBrown distribution
   cox_process_utils.py  # utility functions for LGCP
   finpines.csv          # Finnish pines dataset
 tests/
@@ -39,6 +40,7 @@ docs/
   banana.md             # per-distribution documentation
   neal_funnel.md
   lgcp.md
+  muller_brown.md
 ```
 
 One file per distribution. `__init__.py` re-exports the public API.
@@ -49,7 +51,7 @@ Each distribution is a `@struct.dataclass` (Flax) with a unified interface:
 dist = SomeDistribution(param=value)
 log_p = dist(x)                    # input (..., dim) -> output (...)
 dim = dist.dim                     # int property
-log_Z = dist.log_normalization()   # scalar
+log_Z = dist.log_normalization()   # scalar; raises NotImplementedError if intractable
 samples = dist.sample(key, n)      # (n, dim) -- Banana2D, NealFunnel only
 ```
 

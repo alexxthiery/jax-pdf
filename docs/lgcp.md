@@ -1,6 +1,6 @@
 # LGCP (Log Gaussian Cox Process)
 
-A Log Gaussian Cox Process on the Finnish Pines dataset, used as a spatial statistics benchmark. This is an unnormalized posterior density.
+A Log Gaussian Cox Process on the Finnish Pines dataset, used as a spatial statistics benchmark. This is an unnormalized posterior density: `log_normalization()` raises `NotImplementedError` and no exact sampler is available.
 
 ## Mathematical definition
 

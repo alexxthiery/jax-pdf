@@ -150,16 +150,14 @@ class LGCP:
         return prior + likelihood
 
     def log_normalization(self) -> Array:
-        """Log normalizing constant of the prior (not the full posterior).
+        """Not available: normalizing constant is intractable.
 
-        Returns:
-            Log normalization of the GP prior component.
-
-        Note:
-            The full LGCP posterior is unnormalized (intractable Z).
-            This returns only the prior's normalization for diagnostics.
+        Raises:
+            NotImplementedError: Always.
         """
-        return jnp.array(self._log_norm)
+        raise NotImplementedError(
+            "LGCP normalizing constant is intractable."
+        )
 
     def map_estimate(
         self,
