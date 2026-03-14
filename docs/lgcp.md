@@ -65,3 +65,8 @@ mu, cov = laplace["mu"], laplace["cov"]
 ## MAP estimate visualization
 
 ![MAP estimate of the log-intensity field](../examples/log_gaussian_pine_map_estimate.png)
+
+## References
+
+- Moller, J., Syversveen, A. R., and Waagepetersen, R. P. (1998). Log Gaussian Cox processes. *Scandinavian Journal of Statistics*, 25(3), 451--482. Introduced the LGCP model.
+- Girolami, M. and Calderhead, B. (2011). Riemann manifold Langevin and Hamiltonian Monte Carlo methods. *Journal of the Royal Statistical Society: Series B*, 73(2), 123--214. Popularized this LGCP setup as a standard HMC benchmark.
