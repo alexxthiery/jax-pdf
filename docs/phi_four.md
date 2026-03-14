@@ -92,3 +92,8 @@ biased = PhiFour(a=0.1, b=0.1, dim_grid=100)
 The normalizing constant is intractable.
 Calling `log_normalization()` raises `NotImplementedError`.
 No exact sampler is available.
+
+## References
+
+- Albergo, M. S., Kanwar, G., and Shanahan, P. E. (2019). Flow-based generative models for Markov chain Monte Carlo in lattice field theory. *Physical Review D*, 100, 034515. Established $\phi^4$ lattice field theory as a sampling benchmark (2D lattice; the 1D variant here is a direct restriction).
+- Montvay, I. and Munster, G. (1994). *Quantum Fields on a Lattice*. Cambridge University Press. Textbook reference for lattice $\phi^4$ field theory.

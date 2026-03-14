@@ -46,3 +46,7 @@ Varying difficulty:
 thin = Banana2D(sigma=0.01)   # harder
 fat = Banana2D(sigma=1.0)     # easier
 ```
+
+## References
+
+- Haario, H., Saksman, E., and Tamminen, J. (1999). Adaptive proposal distribution for random walk Metropolis algorithm. *Computational Statistics*, 14, 375--395. Introduced the banana-shaped target as an MCMC benchmark.

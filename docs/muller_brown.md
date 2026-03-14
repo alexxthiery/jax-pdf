@@ -63,3 +63,7 @@ hard = MullerBrown(beta=5.0)   # deep wells, high barriers
 The normalizing constant is intractable.
 Calling `log_normalization()` raises `NotImplementedError`.
 No exact sampler is available.
+
+## References
+
+- Muller, K. and Brown, L. D. (1979). Location of saddle points and minimum energy paths by a constrained simplex optimization procedure. *Theoretica Chimica Acta*, 53(1), 75--93. Original definition of the potential energy surface.
