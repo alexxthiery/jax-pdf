@@ -7,13 +7,13 @@ The phi-four ($\phi^4$) lattice field theory on a 1D lattice, a standard benchma
 The unnormalized log-density is
 
 $$
-\log p(\phi) = -\beta \, U(\phi)
+\log p(\phi) = -\beta U(\phi)
 $$
 
 where the energy combines nearest-neighbor coupling with a local double-well potential:
 
 $$
-U(\phi) = c \sum_{i} \frac{(\phi_{i+1} - \phi_i)^2}{2} + \frac{1}{c} \sum_{i} \left[\frac{(1 - \phi_i^2)^2}{4} + b \, \phi_i\right]
+U(\phi) = c \sum_{i} \frac{(\phi_{i+1} - \phi_i)^2}{2} + \frac{1}{c} \sum_{i} \left[\frac{(1 - \phi_i^2)^2}{4} + b \phi_i\right]
 $$
 
 where $c = a \cdot d$ and $d$ is `dim_grid`.
