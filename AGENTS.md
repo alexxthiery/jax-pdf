@@ -73,6 +73,7 @@ Docs must render on GitHub. GitHub uses KaTeX, not full LaTeX.
 - `$...$` for inline math, `$$...$$` for display (blank lines around `$$`)
 - No `\texttt{}`, `\textrm{}` in math. Use `\text{}` or put words outside math in backticks
 - No escaped underscores in math: `$\phi_i$` not `$\phi\_i$`
+- No manual spacing (`\,`, `\;`, `\quad`). KaTeX handles spacing; just delete them
 - Do not mix inline code and math (e.g., `` `n`$^2$ ``). Use `$n^2$` or Unicode `n²`
 - In tables, use `\lvert`, `\rvert`, `\mid` instead of raw `|` inside math
 

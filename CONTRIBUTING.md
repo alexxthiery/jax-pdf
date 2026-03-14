@@ -139,6 +139,7 @@ Rules for math in `.md` files:
 - Blank line before and after `$$` blocks
 - No `\texttt{}`, `\textrm{}`, or other text-mode commands inside math. Use `\text{}` if you need words in math, or better, put the word outside the math delimiters in backticks
 - No escaped underscores (`\_`) inside math. Use raw underscores: `$\phi_i$` not `$\phi\_i$`
+- No manual spacing commands (`\,`, `\;`, `\!`, `\quad`). KaTeX handles spacing; just delete them
 - Do not mix inline code and math on the same token (e.g., `` `grid_dim`$^2$ ``). Use either all-math (`$d^2$`) or Unicode superscripts (`grid_dim²`)
 - Avoid `\mathbb`, `\mathcal` in table cells; they sometimes break. If needed, test on GitHub
 - Pipes `|` inside math in tables conflict with table syntax. Use `\lvert`, `\rvert`, `\mid` instead
