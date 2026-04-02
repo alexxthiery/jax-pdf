@@ -18,13 +18,22 @@ class LennardJones:
 
     The minimum of each pair interaction is -epsilon at r = rm.
 
-    Harmonic trap on the center of mass:
-        U_trap = (trap_scale/2) * N * ||COM||^2
+    Harmonic trap (controlled by ``trap_mode``):
 
-    where COM = (1/N) * sum_i x_i is the center of mass. This penalizes
-    only the position of the center of mass, not the internal spread of
-    the cluster. The pair potential is therefore unaffected by the trap,
-    and the distribution factorizes as p(x) = p_LJ(internal) * p_trap(COM).
+        'individual' (default):
+            U_trap = (trap_scale/2) * sum_i ||x_i||^2
+            Penalizes each particle's distance from the origin. This
+            affects both the center of mass and the internal spread.
+            Used in ML benchmarks (e.g., FAB, normalizing flows).
+
+        'com':
+            U_trap = (trap_scale/2) * N * ||COM||^2
+            Penalizes only the center of mass position. The pair
+            potential is unaffected, and the distribution factorizes
+            as p(x) = p_LJ(internal) * p_trap(COM). This means the
+            statistics of relative particle positions are identical
+            to those of the pure potential with COM fixed to zero.
+            Standard in physics/chemistry simulations.
 
     Set trap_scale=0 to disable (distribution becomes improper with
     spatial_dim flat directions from translational invariance).
@@ -40,6 +49,7 @@ class LennardJones:
         epsilon: LJ well depth. Default: 1.0.
         rm: LJ equilibrium distance (potential minimum). Default: 1.0.
         trap_scale: Harmonic trap strength. Default: 1.0.
+        trap_mode: 'individual' or 'com'. Default: 'individual'.
         beta: Inverse temperature. Default: 1.0.
     """
 
@@ -56,7 +66,11 @@ class LennardJones:
     """LJ equilibrium distance (potential minimum at r = rm)."""
 
     trap_scale: float = 1.0
-    """Harmonic trap strength on the center of mass. Set to 0.0 to disable."""
+    """Harmonic trap strength. Set to 0.0 to disable."""
+
+    trap_mode: str = 'individual'
+    """Trap mode: 'individual' penalizes each particle's distance from the
+    origin; 'com' penalizes only the center of mass."""
 
     beta: float = 1.0
     """Inverse temperature."""
@@ -78,6 +92,10 @@ class LennardJones:
             raise ValueError(f"rm must be positive, got {self.rm}")
         if self.beta <= 0:
             raise ValueError(f"beta must be positive, got {self.beta}")
+        if self.trap_mode not in ('individual', 'com'):
+            raise ValueError(
+                f"trap_mode must be 'individual' or 'com', got '{self.trap_mode}'"
+            )
 
     @property
     def dim(self) -> int:
@@ -107,9 +125,12 @@ class LennardJones:
             self.epsilon * (inv_r**12 - 2.0 * inv_r**6), axis=-1
         )
 
-        # Harmonic trap on the center of mass
-        com = pos.mean(axis=-2)  # (..., d)
-        u_trap = 0.5 * self.trap_scale * n * jnp.sum(com**2, axis=-1)
+        # Harmonic trap
+        if self.trap_mode == 'individual':
+            u_trap = 0.5 * self.trap_scale * jnp.sum(pos**2, axis=(-2, -1))
+        else:  # 'com'
+            com = pos.mean(axis=-2)  # (..., d)
+            u_trap = 0.5 * self.trap_scale * n * jnp.sum(com**2, axis=-1)
 
         return -self.beta * (u_lj + u_trap)
 
