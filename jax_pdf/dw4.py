@@ -18,13 +18,13 @@ class DW4:
 
     where r_ij is the Euclidean distance between particles i and j.
 
-    Harmonic trap centered at the origin:
-        U_trap(x) = (trap_scale/2) * sum_i ||x_i||^2
+    Harmonic trap on the center of mass:
+        U_trap(x) = (trap_scale/2) * N * ||COM||^2
 
-    This breaks translational invariance and makes the distribution
-    proper (normalizable). It decomposes as a penalty on both the
-    center-of-mass position and the internal spread:
-        sum_i ||x_i||^2 = sum_i ||x_i - COM||^2 + N*||COM||^2
+    where COM = (1/N) * sum_i x_i is the center of mass. This penalizes
+    only the position of the center of mass, not the internal spread of
+    the cluster. The pair potential is therefore unaffected by the trap,
+    and the distribution factorizes as p(x) = p_DW(internal) * p_trap(COM).
 
     Set trap_scale=0 to disable (distribution becomes improper with
     2 flat directions from translational invariance).
@@ -57,7 +57,7 @@ class DW4:
     """Distance offset (center of the quartic)."""
 
     trap_scale: float = 1.0
-    """Harmonic trap strength. Set to 0.0 to disable."""
+    """Harmonic trap strength on the center of mass. Set to 0.0 to disable."""
 
     beta: float = 1.0
     """Inverse temperature."""
@@ -90,8 +90,10 @@ class DW4:
         d = r_pairs - self.r0
         u_dw = jnp.sum(self.a * d**4 + self.b * d**2 + self.c, axis=-1)
 
-        # Harmonic trap centered at the origin
-        u_trap = 0.5 * self.trap_scale * jnp.sum(pos**2, axis=(-2, -1))
+        # Harmonic trap on the center of mass
+        n = 4  # number of particles
+        com = pos.mean(axis=-2)  # (..., 2)
+        u_trap = 0.5 * self.trap_scale * n * jnp.sum(com**2, axis=-1)
 
         return -self.beta * (u_dw + u_trap)
 
