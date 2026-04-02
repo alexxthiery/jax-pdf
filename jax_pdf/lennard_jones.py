@@ -18,13 +18,13 @@ class LennardJones:
 
     The minimum of each pair interaction is -epsilon at r = rm.
 
-    Harmonic trap centered at the origin:
-        U_trap = (trap_scale/2) * sum_i ||x_i||^2
+    Harmonic trap on the center of mass:
+        U_trap = (trap_scale/2) * N * ||COM||^2
 
-    This breaks translational invariance and makes the distribution
-    proper (normalizable). It decomposes as a penalty on both the
-    center-of-mass position and the internal spread:
-        sum_i ||x_i||^2 = sum_i ||x_i - COM||^2 + N*||COM||^2
+    where COM = (1/N) * sum_i x_i is the center of mass. This penalizes
+    only the position of the center of mass, not the internal spread of
+    the cluster. The pair potential is therefore unaffected by the trap,
+    and the distribution factorizes as p(x) = p_LJ(internal) * p_trap(COM).
 
     Set trap_scale=0 to disable (distribution becomes improper with
     spatial_dim flat directions from translational invariance).
@@ -56,7 +56,7 @@ class LennardJones:
     """LJ equilibrium distance (potential minimum at r = rm)."""
 
     trap_scale: float = 1.0
-    """Harmonic trap strength. Set to 0.0 to disable."""
+    """Harmonic trap strength on the center of mass. Set to 0.0 to disable."""
 
     beta: float = 1.0
     """Inverse temperature."""
@@ -107,8 +107,9 @@ class LennardJones:
             self.epsilon * (inv_r**12 - 2.0 * inv_r**6), axis=-1
         )
 
-        # Harmonic trap centered at the origin
-        u_trap = 0.5 * self.trap_scale * jnp.sum(pos**2, axis=(-2, -1))
+        # Harmonic trap on the center of mass
+        com = pos.mean(axis=-2)  # (..., d)
+        u_trap = 0.5 * self.trap_scale * n * jnp.sum(com**2, axis=-1)
 
         return -self.beta * (u_lj + u_trap)
 
