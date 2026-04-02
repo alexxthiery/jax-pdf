@@ -26,19 +26,33 @@ $$
 
 Each pair interaction has minimum $-\varepsilon$ at distance $r = r_m$. The $r^{-12}$ term is short-range repulsion; the $-2r^{-6}$ term is long-range attraction. No cutoff distance is applied (these are isolated clusters, not bulk simulations).
 
-### Harmonic trap on the center of mass
+### Harmonic trap
+
+The trap breaks translational invariance and makes the distribution proper (normalizable). Two modes are available via `trap_mode`:
+
+**`'individual'` (default)** -- penalizes each particle's distance from the origin:
+
+$$
+U_{\text{trap}}(x) = \frac{s}{2} \sum_{i=1}^{N} \lVert x_i \rVert^2
+$$
+
+This affects both the center of mass and the internal spread. Used in ML benchmarks (e.g., FAB, normalizing flows).
+
+**`'com'`** -- penalizes only the center of mass:
 
 $$
 U_{\text{trap}}(x) = \frac{s}{2} \, N \, \lVert \bar{x} \rVert^2
 $$
 
-where $\bar{x} = \frac{1}{N}\sum_i x_i$ is the center of mass. This penalizes only the position of the center of mass, not the internal spread of the cluster. The pair potential is unaffected by the trap, and the distribution factorizes:
+where $\bar{x} = \frac{1}{N}\sum_i x_i$. The pair potential is unaffected, and the distribution factorizes:
 
 $$
 p(x) \propto \underbrace{e^{-\beta U_{\text{LJ}}(x_{\text{internal}})}}_{\text{LJ on internal coords}} \times \underbrace{e^{-\frac{\beta s N}{2} \lVert \bar{x} \rVert^2}}_{\text{Gaussian on COM}}
 $$
 
-This means the statistics of relative particle positions are identical to those of the pure (trapless) distribution with COM fixed to zero. Set `trap_scale=0` to recover the pure LJ potential (improper, with `spatial_dim` flat translational directions).
+This means the statistics of relative particle positions are identical to those of the pure (trapless) distribution with COM fixed to zero. Standard in physics/chemistry simulations.
+
+Set `trap_scale=0` to recover the pure LJ potential (improper, with `spatial_dim` flat translational directions).
 
 ## Symmetries
 
@@ -57,7 +71,8 @@ LJ clusters have a rugged energy landscape with many local minima separated by h
 | `spatial_dim` | `3` | Spatial dimension per particle (2D or 3D) |
 | `epsilon` | `1.0` | LJ well depth |
 | `rm` | `1.0` | Equilibrium distance (potential minimum at $r = r_m$) |
-| `trap_scale` | `1.0` | Harmonic trap strength on the center of mass (0 to disable) |
+| `trap_scale` | `1.0` | Harmonic trap strength (0 to disable) |
+| `trap_mode` | `'individual'` | `'individual'`: per-particle trap; `'com'`: center-of-mass only |
 | `beta` | `1.0` | Inverse temperature |
 
 ## Usage

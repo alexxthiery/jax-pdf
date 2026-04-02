@@ -28,19 +28,33 @@ where $r_{ij} = \lVert x_i - x_j \rVert$ is the Euclidean distance between parti
 
 With the default parameters ($a = 0.9$, $b = -4$, $r_0 = 4$), each pair potential has two minima at $r \approx 2.51$ and $r \approx 5.49$, creating a multimodal distribution over particle configurations.
 
-### Harmonic trap on the center of mass
+### Harmonic trap
+
+The trap breaks translational invariance and makes the distribution proper (normalizable). Two modes are available via `trap_mode`:
+
+**`'individual'` (default)** -- penalizes each particle's distance from the origin:
+
+$$
+U_{\text{trap}}(x) = \frac{s}{2} \sum_{i=1}^{N} \lVert x_i \rVert^2
+$$
+
+This affects both the center of mass and the internal spread. Used in ML benchmarks (e.g., FAB, normalizing flows).
+
+**`'com'`** -- penalizes only the center of mass:
 
 $$
 U_{\text{trap}}(x) = \frac{s}{2} \, N \, \lVert \bar{x} \rVert^2
 $$
 
-where $\bar{x} = \frac{1}{N}\sum_i x_i$ is the center of mass. This penalizes only the position of the center of mass, not the internal spread of the cluster. The pair potential is unaffected by the trap, and the distribution factorizes:
+where $\bar{x} = \frac{1}{N}\sum_i x_i$. The pair potential is unaffected, and the distribution factorizes:
 
 $$
 p(x) \propto \underbrace{e^{-\beta U_{\text{DW}}(x_{\text{internal}})}}_{\text{pair potential on internal coords}} \times \underbrace{e^{-\frac{\beta s N}{2} \lVert \bar{x} \rVert^2}}_{\text{Gaussian on COM}}
 $$
 
-This means the statistics of relative particle positions are identical to those of the pure (trapless) distribution with COM fixed to zero. Set `trap_scale=0` to recover the pure pairwise potential (improper, with 2 flat translational directions).
+This means the statistics of relative particle positions are identical to those of the pure (trapless) distribution with COM fixed to zero. Standard in physics/chemistry simulations.
+
+Set `trap_scale=0` to recover the pure pairwise potential (improper, with 2 flat translational directions).
 
 ## Why it's hard
 
@@ -59,7 +73,8 @@ Each of the 6 particle pairs independently prefers one of two inter-particle dis
 | `b` | `-4.0` | Quadratic coefficient (negative = double well) |
 | `c` | `0.0` | Constant offset in pair potential |
 | `r0` | `4.0` | Distance offset (center of quartic) |
-| `trap_scale` | `1.0` | Harmonic trap strength on the center of mass (0 to disable) |
+| `trap_scale` | `1.0` | Harmonic trap strength (0 to disable) |
+| `trap_mode` | `'individual'` | `'individual'`: per-particle trap; `'com'`: center-of-mass only |
 | `beta` | `1.0` | Inverse temperature |
 
 ## Usage
