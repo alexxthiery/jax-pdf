@@ -39,21 +39,26 @@ class TestLennardJones:
 
     def test_output_shape_single(self):
         dist = LennardJones(n_particles=3, spatial_dim=2)
-        x = jnp.ones(6)
+        x = jnp.ones((3, 2))
         assert dist(x).shape == ()
 
     def test_output_shape_batch(self):
         dist = LennardJones(n_particles=3, spatial_dim=2)
-        x = jnp.ones((5, 6))
+        x = jnp.ones((5, 3, 2))
         assert dist(x).shape == (5,)
+
+    def test_wrong_shape_raises(self):
+        """Legacy flat input is rejected with a clear error."""
+        dist = LennardJones(n_particles=3, spatial_dim=2)
+        with pytest.raises(ValueError, match="x.shape\\[-2:\\] == \\(3, 2\\)"):
+            dist(jnp.ones(6))
 
     def test_lj_minimum_at_rm(self):
         """Two particles at distance rm: LJ pair energy = -epsilon."""
         dist = LennardJones(
             n_particles=2, spatial_dim=3, trap_scale=0.0
         )
-        # Place particles at (0,0,0) and (rm,0,0)
-        x = jnp.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+        x = jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
         log_p = dist(x)
         # U_LJ = eps * ((rm/rm)^12 - 2*(rm/rm)^6) = eps*(1 - 2) = -eps
         # log p = -beta * (-eps) = eps
@@ -63,9 +68,9 @@ class TestLennardJones:
         """Swapping particles does not change energy."""
         dist = LennardJones(n_particles=4, spatial_dim=3)
         key = jax.random.PRNGKey(0)
-        x = jax.random.normal(key, (12,))
-        # Swap particles 0 and 2 (coords 0:3 <-> 6:9)
-        x_swapped = x.at[0:3].set(x[6:9]).at[6:9].set(x[0:3])
+        x = jax.random.normal(key, (4, 3))
+        # Swap particles 0 and 2.
+        x_swapped = x.at[0].set(x[2]).at[2].set(x[0])
         assert jnp.allclose(dist(x), dist(x_swapped), atol=1e-6)
 
     def test_translation_invariance_without_trap(self):
@@ -74,9 +79,9 @@ class TestLennardJones:
             n_particles=3, spatial_dim=2, trap_scale=0.0
         )
         key = jax.random.PRNGKey(4)
-        x = jax.random.normal(key, (6,))
+        x = jax.random.normal(key, (3, 2))
         shift = jnp.array([5.0, -3.0])
-        x_shifted = x + jnp.tile(shift, 3)
+        x_shifted = x + shift  # broadcasts across particle axis
         assert jnp.allclose(dist(x), dist(x_shifted), atol=1e-5)
 
     def test_trap_breaks_translation_invariance(self):
@@ -85,14 +90,14 @@ class TestLennardJones:
             n_particles=3, spatial_dim=2, trap_scale=1.0
         )
         key = jax.random.PRNGKey(4)
-        x = jax.random.normal(key, (6,))
+        x = jax.random.normal(key, (3, 2))
         shift = jnp.array([5.0, -3.0])
-        x_shifted = x + jnp.tile(shift, 3)
+        x_shifted = x + shift
         assert not jnp.allclose(dist(x), dist(x_shifted), atol=1e-3)
 
     def test_trap_zero_at_origin(self):
         """Trap contributes nothing when all particles are at origin."""
-        x = jnp.zeros(9)
+        x = jnp.zeros((3, 3))
         dist = LennardJones(n_particles=3, trap_scale=1.0)
         dist_no_trap = LennardJones(n_particles=3, trap_scale=0.0)
         assert jnp.allclose(dist(x), dist_no_trap(x), atol=1e-6)
@@ -100,8 +105,9 @@ class TestLennardJones:
     def test_trap_penalizes_distance_from_origin(self):
         """Trap increases energy for particles far from origin."""
         dist = LennardJones(n_particles=3, spatial_dim=2, trap_scale=1.0)
-        key = jax.random.PRNGKey(5)
-        x_near = jax.random.normal(key, (6,)) * 0.1
+        # Deterministic positions near the LJ pair minimum so u_lj stays O(1)
+        # and the trap difference isn't lost to float32 cancellation.
+        x_near = jnp.array([[0.0, 0.0], [1.0, 0.0], [0.5, 0.866]])
         x_far = x_near + 10.0
         # Pair distances are the same, but trap penalizes x_far more
         dist_no_trap = LennardJones(
@@ -114,7 +120,7 @@ class TestLennardJones:
     def test_beta_scaling(self):
         """log p at beta=2 should be 2x log p at beta=1."""
         key = jax.random.PRNGKey(1)
-        x = jax.random.normal(key, (6,))
+        x = jax.random.normal(key, (3, 2))
         lp1 = LennardJones(
             n_particles=3, spatial_dim=2, beta=1.0
         )(x)
@@ -126,15 +132,17 @@ class TestLennardJones:
     def test_gradient_finite_lj13(self):
         dist = LennardJones()
         key = jax.random.PRNGKey(2)
-        x = jax.random.normal(key, (39,))
+        x = jax.random.normal(key, (13, 3))
         grad = jax.grad(dist)(x)
+        assert grad.shape == (13, 3)
         assert jnp.all(jnp.isfinite(grad))
 
     def test_gradient_finite_lj55(self):
         dist = LennardJones(n_particles=55)
         key = jax.random.PRNGKey(3)
-        x = jax.random.normal(key, (165,))
+        x = jax.random.normal(key, (55, 3))
         grad = jax.grad(dist)(x)
+        assert grad.shape == (55, 3)
         assert jnp.all(jnp.isfinite(grad))
 
     def test_log_normalization_raises(self):

@@ -105,13 +105,18 @@ class LennardJones:
         """Evaluate unnormalized log-density.
 
         Args:
-            x: Particle positions of shape (..., n_particles * spatial_dim).
+            x: Particle positions of shape (..., n_particles, spatial_dim).
 
         Returns:
             Log-density of shape (...).
         """
         n, d = self.n_particles, self.spatial_dim
-        pos = x.reshape(x.shape[:-1] + (n, d))
+        if x.shape[-2:] != (n, d):
+            raise ValueError(
+                f"LennardJones expected x.shape[-2:] == ({n}, {d}), "
+                f"got shape {tuple(x.shape)}."
+            )
+        pos = x
 
         # Pairwise distances, unique pairs i < j
         diff = pos[..., :, None, :] - pos[..., None, :, :]

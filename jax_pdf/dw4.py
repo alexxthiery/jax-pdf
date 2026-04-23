@@ -88,17 +88,29 @@ class DW4:
     def dim(self) -> int:
         return 8
 
+    @property
+    def n_particles(self) -> int:
+        return 4
+
+    @property
+    def spatial_dim(self) -> int:
+        return 2
+
     def __call__(self, x: Array) -> Array:
         """Evaluate unnormalized log-density.
 
         Args:
-            x: Particle positions of shape (..., 8). Interpreted as 4
-                particles in 2D: x[..., 0:2] is particle 0, etc.
+            x: Particle positions of shape (..., 4, 2). x[..., i, :] is
+                particle i's 2D position.
 
         Returns:
             Log-density of shape (...).
         """
-        pos = x.reshape(x.shape[:-1] + (4, 2))
+        if x.shape[-2:] != (4, 2):
+            raise ValueError(
+                f"DW4 expected x.shape[-2:] == (4, 2), got shape {tuple(x.shape)}."
+            )
+        pos = x
 
         # Pairwise distances, unique pairs i < j
         diff = pos[..., :, None, :] - pos[..., None, :, :]

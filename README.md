@@ -14,20 +14,23 @@ pip install -e .
 
 ## Unified interface
 
-All distributions share a common core API:
+All distributions share a common core API. Input shape follows a two-tier convention:
+
+- **Generic distributions** (`Banana2D`, `NealFunnel`, `LGCP`, `MullerBrown`, `PhiFour`, `DoubleWell`) take flat input `(..., dim)`.
+- **Particle distributions** (`LennardJones`, `DW4`) take structured input `(..., n_particles, spatial_dim)` because the particle axis is semantically meaningful and downstream consumers (normalising flows over particle systems) work in that shape natively. `dist.dim` still reports the flat DoF count (`n_particles * spatial_dim`); `n_particles` and `spatial_dim` are exposed as properties.
 
 ```python
 import jax
 
 dist = SomeDistribution(...)
 
-# Log probability: input (..., dim) -> output (...)
+# Log probability: output is scalar over the event axes.
 log_p = dist(x)
 
-# Gradient
+# Gradient (grad.shape matches x.shape)
 grad = jax.grad(dist)(x)
 
-# Dimensionality
+# Dimensionality (flat DoF count)
 d = dist.dim
 
 # Log normalizing constant
@@ -61,9 +64,16 @@ Core methods shared by all distributions:
 
 | Method | Signature | Returns |
 |--------|-----------|---------|
-| `__call__` | `(x: Array) -> Array` | Log probability. Input `(..., dim)`, output `(...)`. |
+| `__call__` | `(x: Array) -> Array` | Log probability. Input `(..., dim)` for generic distributions or `(..., n_particles, spatial_dim)` for particle distributions. Output shape is the leading batch shape. |
 | `log_normalization` | `() -> float` | Log normalizing constant. Raises `NotImplementedError` if intractable. |
-| `dim` | property | Dimensionality (int). |
+| `dim` | property | Flat DoF count (int). |
+
+Particle distributions (`LennardJones`, `DW4`) additionally expose:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `n_particles` | int | Number of particles. |
+| `spatial_dim` | int | Spatial dimension per particle (2 or 3). |
 
 Banana2D, NealFunnel, and DoubleWell also provide:
 

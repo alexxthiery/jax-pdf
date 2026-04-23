@@ -79,23 +79,26 @@ Each of the 6 particle pairs independently prefers one of two inter-particle dis
 
 ## Usage
 
+Input shape is `(..., 4, 2)` (4 particles, 2D). The `dim` property reports the flat DoF count (8).
+
 ```python
 from jax_pdf import DW4
 import jax
 
 dist = DW4()
-print(dist.dim)  # 8 (4 particles x 2D)
+print(dist.dim)                                  # 8
+print(dist.n_particles, dist.spatial_dim)        # 4 2
 
 # Log-density
-x = jax.numpy.ones(8)
+x = jax.numpy.ones((4, 2))
 log_p = dist(x)
 
 # Gradient
-grad = jax.grad(dist)(x)
+grad = jax.grad(dist)(x)                         # shape (4, 2)
 
 # Batch evaluation
-xs = jax.random.normal(jax.random.PRNGKey(0), (100, 8))
-log_ps = dist(xs)  # shape (100,)
+xs = jax.random.normal(jax.random.PRNGKey(0), (100, 4, 2))
+log_ps = dist(xs)                                # shape (100,)
 ```
 
 Varying difficulty:
