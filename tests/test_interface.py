@@ -37,13 +37,19 @@ DISTS_WITH_LOG_NORM = [
 ]
 
 
-def _test_point(dim):
-    """Deterministic non-degenerate test point.
+def _test_point(dist):
+    """Deterministic non-degenerate test point shaped to the distribution.
 
-    Uses linspace to spread coordinates apart, avoiding singularities
-    in potentials with 1/r terms (e.g. LennardJones at r=0).
+    Uses linspace to spread coordinates apart, avoiding singularities in
+    potentials with 1/r terms (e.g. LennardJones at r=0). Particle
+    distributions (those exposing ``n_particles`` and ``spatial_dim``)
+    get the structured shape ``(n_particles, spatial_dim)``; flat
+    distributions get ``(dim,)``.
     """
-    return jnp.linspace(0.1, 1.0, dim)
+    if hasattr(dist, "n_particles") and hasattr(dist, "spatial_dim"):
+        n, d = dist.n_particles, dist.spatial_dim
+        return jnp.linspace(0.1, 1.0, n * d).reshape(n, d)
+    return jnp.linspace(0.1, 1.0, dist.dim)
 
 
 @pytest.mark.parametrize("dist", ALL_DISTS, ids=lambda d: type(d).__name__)
@@ -55,21 +61,22 @@ class TestInterface:
         assert dist.dim > 0
 
     def test_call_returns_scalar(self, dist):
-        x = _test_point(dist.dim)
+        x = _test_point(dist)
         lp = dist(x)
         assert lp.shape == ()
         assert jnp.isfinite(lp)
 
     def test_call_batch(self, dist):
-        x = jnp.broadcast_to(_test_point(dist.dim), (3, dist.dim))
-        lp = dist(x)
+        x = _test_point(dist)
+        x_batch = jnp.broadcast_to(x, (3,) + x.shape)
+        lp = dist(x_batch)
         assert lp.shape == (3,)
         assert jnp.all(jnp.isfinite(lp))
 
     def test_grad(self, dist):
-        x = _test_point(dist.dim)
+        x = _test_point(dist)
         g = jax.grad(dist)(x)
-        assert g.shape == (dist.dim,)
+        assert g.shape == x.shape
         assert jnp.all(jnp.isfinite(g))
 
 

@@ -77,26 +77,29 @@ LJ clusters have a rugged energy landscape with many local minima separated by h
 
 ## Usage
 
+Input shape is `(..., n_particles, spatial_dim)`. The `dim` property still reports the flat DoF count for callers that need it.
+
 ```python
 from jax_pdf import LennardJones
 import jax
 
 # LJ13 (default)
 lj13 = LennardJones()
-print(lj13.dim)  # 39
+print(lj13.dim)                                      # 39
+print(lj13.n_particles, lj13.spatial_dim)            # 13 3
 
 # LJ55
 lj55 = LennardJones(n_particles=55)
-print(lj55.dim)  # 165
+print(lj55.dim)                                      # 165
 
 # Log-density and gradient
-x = jax.random.normal(jax.random.PRNGKey(0), (39,))
+x = jax.random.normal(jax.random.PRNGKey(0), (13, 3))
 log_p = lj13(x)
-grad = jax.grad(lj13)(x)
+grad = jax.grad(lj13)(x)                             # shape (13, 3)
 
 # Batch evaluation
-xs = jax.random.normal(jax.random.PRNGKey(1), (100, 39))
-log_ps = lj13(xs)  # shape (100,)
+xs = jax.random.normal(jax.random.PRNGKey(1), (100, 13, 3))
+log_ps = lj13(xs)                                    # shape (100,)
 ```
 
 Varying difficulty:

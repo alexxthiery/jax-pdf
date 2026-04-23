@@ -61,15 +61,28 @@ docs/
 
 One file per distribution. `__init__.py` re-exports the public API.
 
-Each distribution is a `@struct.dataclass` (Flax) with a unified interface:
+Each distribution is a `@struct.dataclass` (Flax) with a two-tier interface:
 
 ```python
 dist = SomeDistribution(param=value)
+
+# Generic distributions (Banana2D, NealFunnel, LGCP, MullerBrown, PhiFour, DoubleWell):
 log_p = dist(x)                    # input (..., dim) -> output (...)
-dim = dist.dim                     # int property
+
+# Particle distributions (LennardJones, DW4):
+log_p = dist(x)                    # input (..., n_particles, spatial_dim) -> output (...)
+
+# Shared across both tiers:
+dim = dist.dim                     # int property: flat DoF count
 log_Z = dist.log_normalization()   # scalar; raises NotImplementedError if intractable
 samples = dist.sample(key, n)      # (n, dim) -- Banana2D, DoubleWell, NealFunnel
+
+# Particle tier additionally exposes:
+n = dist.n_particles               # int
+d = dist.spatial_dim               # int
 ```
+
+Why two tiers: particle distributions have a semantically meaningful particle axis. Downstream consumers (normalising flows over particle systems, equivariant networks) work in `(N, d)` natively, so forcing a reshape at every call site is wasteful and error-prone. The `dim` property is preserved across both tiers so callers that reason about flat DoF count (parameter allocation, MCMC chain length) do not need a conditional.
 
 ## Code conventions
 
@@ -110,7 +123,7 @@ See CONTRIBUTING.md for the full list and examples.
 
 ### Never
 
-- Break the unified interface (rename `__call__`, change `dim` to a method, etc.)
+- Rename `__call__`, turn `dim` into a method, or collapse the two tiers into one (do not "fix" particle distributions back to flat input; the structured shape is load-bearing for downstream flow consumers)
 - Add distribution-specific method names for core functionality
 - Use factories (`Dist.create(...)`) instead of direct instantiation
 - Remove or modify the Finnish pines dataset (`finpines.csv`)

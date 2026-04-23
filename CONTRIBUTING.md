@@ -45,7 +45,11 @@ class MyDist:
         """Evaluate log probability density.
 
         Args:
-            x: Input point(s) of shape (..., dim).
+            x: Input point(s). Generic distributions take shape
+                ``(..., dim)``. Particle distributions take structured
+                shape ``(..., n_particles, spatial_dim)`` and also
+                expose ``n_particles`` / ``spatial_dim`` properties;
+                see `LennardJones` and `DW4` for the template.
 
         Returns:
             Log probability density of shape (...).
