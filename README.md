@@ -17,7 +17,7 @@ pip install -e .
 All distributions share a common core API. Input shape follows a two-tier convention:
 
 - **Generic distributions** (`Banana2D`, `NealFunnel`, `LGCP`, `MullerBrown`, `PhiFour`, `DoubleWell`) take flat input `(..., dim)`.
-- **Particle distributions** (`LennardJones`, `DW4`) take structured input `(..., n_particles, spatial_dim)` because the particle axis is semantically meaningful and downstream consumers (normalising flows over particle systems) work in that shape natively. `dist.dim` still reports the flat DoF count (`n_particles * spatial_dim`); `n_particles` and `spatial_dim` are exposed as properties.
+- **Particle distributions** (`LennardJones`, `PeriodicLennardJones`, `DW4`) take structured input `(..., n_particles, spatial_dim)` because the particle axis is semantically meaningful and downstream consumers (normalising flows over particle systems) work in that shape natively. `dist.dim` still reports the flat DoF count (`n_particles * spatial_dim`); `n_particles` and `spatial_dim` are exposed as properties.
 
 ```python
 import jax
@@ -43,7 +43,7 @@ Banana2D, NealFunnel, and DoubleWell support sampling:
 samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
 ```
 
-DW4, LennardJones, LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normalization()` raises `NotImplementedError`.
+DW4, LennardJones, PeriodicLennardJones, LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normalization()` raises `NotImplementedError`.
 
 ## Distributions
 
@@ -57,6 +57,7 @@ DW4, LennardJones, LGCP, MullerBrown, and PhiFour are unnormalized: no sampling,
 | `DoubleWell` | configurable | Product of 2D double-well pairs ($2^{D/2}$ modes) | [docs/double_well.md](docs/double_well.md) |
 | `DW4` | 8 | Double-well pair potential over 4 particles in 2D | [docs/dw4.md](docs/dw4.md) |
 | `LennardJones` | configurable | Lennard-Jones cluster with harmonic confinement (LJ13, LJ55) | [docs/lennard_jones.md](docs/lennard_jones.md) |
+| `PeriodicLennardJones` | configurable | Lennard-Jones in a periodic box (minimum-image PBC; soft-core, cutoff, shift) | — |
 
 ## API reference
 
