@@ -17,7 +17,7 @@ pip install -e .
 All distributions share a common core API. Input shape follows a two-tier convention:
 
 - **Generic distributions** (`Banana2D`, `NealFunnel`, `LGCP`, `MullerBrown`, `PhiFour`, `DoubleWell`) take flat input `(..., dim)`.
-- **Particle distributions** (`LennardJones`, `PeriodicLennardJones`, `DW4`) take structured input `(..., n_particles, spatial_dim)` because the particle axis is semantically meaningful and downstream consumers (normalising flows over particle systems) work in that shape natively. `dist.dim` still reports the flat DoF count (`n_particles * spatial_dim`); `n_particles` and `spatial_dim` are exposed as properties.
+- **Particle distributions** (`LennardJones`, `PeriodicLennardJones`, `MonatomicWater`, `HarmonicCrystal`, `DW4`) take structured input `(..., n_particles, spatial_dim)` because the particle axis is semantically meaningful and downstream consumers (normalising flows over particle systems) work in that shape natively. `dist.dim` still reports the flat DoF count (`n_particles * spatial_dim`); `n_particles` and `spatial_dim` are exposed as properties.
 
 ```python
 import jax
@@ -43,7 +43,7 @@ Banana2D, NealFunnel, and DoubleWell support sampling:
 samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
 ```
 
-DW4, LennardJones, PeriodicLennardJones, LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normalization()` raises `NotImplementedError`.
+DW4, LennardJones, PeriodicLennardJones, MonatomicWater, LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normalization()` raises `NotImplementedError`. `HarmonicCrystal` is the exception among the particle targets: its `log_normalization()` is analytic (it exists as a free-energy sanity oracle).
 
 ## Distributions
 
@@ -57,7 +57,9 @@ DW4, LennardJones, PeriodicLennardJones, LGCP, MullerBrown, and PhiFour are unno
 | `DoubleWell` | configurable | Product of 2D double-well pairs ($2^{D/2}$ modes) | [docs/double_well.md](docs/double_well.md) |
 | `DW4` | 8 | Double-well pair potential over 4 particles in 2D | [docs/dw4.md](docs/dw4.md) |
 | `LennardJones` | configurable | Lennard-Jones cluster with harmonic confinement (LJ13, LJ55) | [docs/lennard_jones.md](docs/lennard_jones.md) |
-| `PeriodicLennardJones` | configurable | Lennard-Jones in a periodic box (minimum-image PBC; soft-core, cutoff, shift) | — |
+| `PeriodicLennardJones` | configurable | Lennard-Jones in a periodic box (minimum-image PBC; soft-core, cutoff, shift) | [docs/periodic_lennard_jones.md](docs/periodic_lennard_jones.md) |
+| `MonatomicWater` | configurable | Monatomic (mW) water in a periodic box (Stillinger-Weber 2-body + 3-body tetrahedral-angle term) | [docs/monatomic_water.md](docs/monatomic_water.md) |
+| `HarmonicCrystal` | configurable | Einstein/harmonic crystal with analytic free energy (Boltzmann-generator sanity oracle) | [docs/harmonic_crystal.md](docs/harmonic_crystal.md) |
 
 ## API reference
 
@@ -69,7 +71,7 @@ Core methods shared by all distributions:
 | `log_normalization` | `() -> float` | Log normalizing constant. Raises `NotImplementedError` if intractable. |
 | `dim` | property | Flat DoF count (int). |
 
-Particle distributions (`LennardJones`, `DW4`) additionally expose:
+Particle distributions (`LennardJones`, `PeriodicLennardJones`, `MonatomicWater`, `HarmonicCrystal`, `DW4`) additionally expose:
 
 | Property | Type | Description |
 |----------|------|-------------|
