@@ -3,8 +3,10 @@
 from jax_pdf.banana import Banana2D
 from jax_pdf.double_well import DoubleWell
 from jax_pdf.dw4 import DW4
+from jax_pdf.harmonic_crystal import HarmonicCrystal
 from jax_pdf.lennard_jones import LennardJones
 from jax_pdf.log_gauss_pines import LGCP
+from jax_pdf.monatomic_water import MonatomicWater
 from jax_pdf.muller_brown import MullerBrown
 from jax_pdf.neal_funnel import NealFunnel
 from jax_pdf.periodic_lennard_jones import PeriodicLennardJones
@@ -15,8 +17,10 @@ __all__ = [
     "Banana2D",
     "DoubleWell",
     "DW4",
+    "HarmonicCrystal",
     "LGCP",
     "LennardJones",
+    "MonatomicWater",
     "MullerBrown",
     "NealFunnel",
     "PeriodicLennardJones",
