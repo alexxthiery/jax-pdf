@@ -27,7 +27,8 @@ pytest tests/test_banana.py -v
 
 ```
 jax_pdf/
-  __init__.py           # re-exports: Banana2D, DoubleWell, DW4, LGCP, LennardJones, MullerBrown, NealFunnel, PhiFour
+  __init__.py           # re-exports: Banana2D, DoubleWell, DW4, HarmonicCrystal, LGCP, LennardJones,
+                        #   MonatomicWater, MullerBrown, NealFunnel, PeriodicLennardJones, PhiFour
   banana.py             # Banana2D distribution
   neal_funnel.py        # NealFunnel distribution
   log_gauss_pines.py    # LGCP distribution
@@ -35,28 +36,19 @@ jax_pdf/
   phi_four.py           # PhiFour distribution
   double_well.py        # DoubleWell distribution
   dw4.py                # DW4 distribution (4-particle double-well)
-  lennard_jones.py      # LennardJones distribution (LJ13, LJ55)
+  lennard_jones.py      # LennardJones distribution (LJ13, LJ55; free cluster)
+  periodic_lennard_jones.py  # PeriodicLennardJones (periodic LJ solid, minimum image; == bgmat)
+  monatomic_water.py    # MonatomicWater (mW water, Stillinger-Weber, periodic; == bgmat)
+  harmonic_crystal.py   # HarmonicCrystal (Einstein crystal, exact log Z)
   cox_process_utils.py  # utility functions for LGCP
   finpines.csv          # Finnish pines dataset
 tests/
   test_interface.py     # shared interface tests (parametrized across all dists)
-  test_banana.py        # Banana2D-specific tests
-  test_double_well.py   # DoubleWell-specific tests
-  test_dw4.py           # DW4-specific tests
-  test_lennard_jones.py # LennardJones-specific tests
-  test_neal_funnel.py   # NealFunnel-specific tests
-  test_lgcp.py          # LGCP-specific tests
-  test_muller_brown.py  # MullerBrown-specific tests
-  test_phi_four.py      # PhiFour-specific tests
+  test_<name>.py        # one file per distribution; the periodic targets
+                        #   (periodic LJ, mW) include differential tests against
+                        #   bgmat, skipped if ../bgmat is not importable
 docs/
-  banana.md             # per-distribution documentation
-  neal_funnel.md
-  lgcp.md
-  muller_brown.md
-  phi_four.md
-  double_well.md
-  dw4.md
-  lennard_jones.md
+  <name>.md             # per-distribution documentation, one file per distribution
 ```
 
 One file per distribution. `__init__.py` re-exports the public API.
@@ -69,7 +61,7 @@ dist = SomeDistribution(param=value)
 # Generic distributions (Banana2D, NealFunnel, LGCP, MullerBrown, PhiFour, DoubleWell):
 log_p = dist(x)                    # input (..., dim) -> output (...)
 
-# Particle distributions (LennardJones, DW4):
+# Particle distributions (LennardJones, DW4, PeriodicLennardJones, MonatomicWater, HarmonicCrystal):
 log_p = dist(x)                    # input (..., n_particles, spatial_dim) -> output (...)
 
 # Shared across both tiers:
