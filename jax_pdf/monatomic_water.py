@@ -8,7 +8,9 @@ test); the three-body sum here is vectorised (bgmat's `rollaxis` is removed in
 modern JAX) but identical because the triplet sum is order-independent.
 """
 import math
+from typing import Optional
 
+import jax
 import jax.numpy as jnp
 from flax import struct
 from jax import Array
@@ -37,6 +39,13 @@ class MonatomicWater:
             training, where the flow may sample overlapping particles, set this
             > 0 to keep the two-body energy and its gradient finite; the
             three-body norm is floored separately by ``eps`` inside the sqrt.
+        linearize_below: If set (Angstrom), the two-body potential below this
+            distance is replaced by its tangent line in r,
+            ``phi(r_lin) + (r - r_lin) * phi'(r_lin)``, after the ``min_distance``
+            clip. This is bgmat's training softening (it uses 1.2 with
+            ``min_distance=0.01``); it bounds the steep core that otherwise
+            dominates reverse-KL gradients. The three-body term is unchanged.
+            Default None (exact).
     """
 
     n_particles: int
@@ -44,6 +53,13 @@ class MonatomicWater:
     beta: float = 1.0
     min_distance: float = 0.0
     spatial_dim: int = 3
+    linearize_below: Optional[float] = None
+
+    def __post_init__(self):
+        if self.linearize_below is not None and not self.linearize_below > 0:
+            raise ValueError(
+                f"linearize_below must be positive or None, got {self.linearize_below}"
+            )
 
     @property
     def dim(self) -> int:
@@ -54,18 +70,30 @@ class MonatomicWater:
         diff = x[..., None, :, :] - x[..., :, None, :]
         return diff - self.box_length * jnp.round(diff / self.box_length)
 
-    def _two_body(self, diff: Array) -> Array:
-        n = self.n_particles
-        r2 = jnp.sum(diff**2, axis=-1)                  # (..., N, N), physical
-        r2 = r2 + jnp.eye(n, dtype=r2.dtype)            # diagonal dropped by triu
-        r2 = jnp.clip(r2, self.min_distance**2)
+    @staticmethod
+    def _pair(r2: Array) -> Array:
+        """Unclipped two-body potential (kcal/mol) of the squared distance r2 (Angstrom^2)."""
         red = r2 / MW_SIGMA**2                          # reduced squared distance
         r = jnp.sqrt(red)
         mask = r < MW_REDUCED_CUTOFF
         r = jnp.where(mask, r, 2.0 * MW_REDUCED_CUTOFF)  # safe value (avoid NaN grad)
         term_1 = MW_A * MW_EPSILON * (MW_B / red**2 - 1.0)
         term_2 = jnp.where(mask, jnp.exp(1.0 / (r - MW_REDUCED_CUTOFF)), 0.0)
-        u = term_1 * term_2
+        return term_1 * term_2
+
+    def _two_body(self, diff: Array) -> Array:
+        n = self.n_particles
+        r2 = jnp.sum(diff**2, axis=-1)                  # (..., N, N), physical
+        r2 = r2 + jnp.eye(n, dtype=r2.dtype)            # diagonal dropped by triu
+        r2 = jnp.clip(r2, self.min_distance**2)
+        if self.linearize_below is None:
+            u = self._pair(r2)
+        else:
+            # Same recipe as bgmat's PairwisePotentialEnergy._pairwise_potential:
+            # value and slope in r (not r**2) at r_lin, applied after the clip.
+            lin = jnp.asarray(self.linearize_below, dtype=r2.dtype)
+            e0, g0 = jax.value_and_grad(lambda r: self._pair(r**2))(lin)
+            u = jnp.where(r2 < lin**2, e0 + (jnp.sqrt(r2) - lin) * g0, self._pair(r2))
         return jnp.sum(jnp.triu(u, k=1), axis=(-2, -1))
 
     def _three_body(self, dr: Array) -> Array:

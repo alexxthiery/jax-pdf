@@ -1,9 +1,50 @@
 """Tests for MonatomicWater (Stillinger-Weber mW), incl. bgmat differential."""
+import math
+import os
+import sys
+
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from jax_pdf import MonatomicWater
+
+# Molinero-Moore two-body parameters, written out independently of the module
+# under test (Angstrom, kcal/mol) for the analytic oracles below.
+_A, _B, _EPS, _SIGMA, _CUT = 7.049556277, 0.6022245584, 6.189, 2.3925, 1.8
+
+
+def _phi2(r):
+    """mW two-body potential phi(r) in kcal/mol at distance r (Angstrom), float64."""
+    rr = r / _SIGMA
+    if rr >= _CUT:
+        return 0.0
+    return _A * _EPS * (_B * rr**-4 - 1.0) * math.exp(1.0 / (rr - _CUT))
+
+
+def _dphi2(r, h=1e-6):
+    """Central finite-difference slope of phi at r (float64; error ~1e-9)."""
+    return (_phi2(r + h) - _phi2(r - h)) / (2.0 * h)
+
+
+def _pair_config(r):
+    """Two particles a distance r apart along x, far from the box walls."""
+    return jnp.array([[5.0, 5.0, 5.0], [5.0 + r, 5.0, 5.0]])
+
+
+def _bgmat_energy_class():
+    """bgmat's MonatomicWaterEnergy from the sibling repo, or skip the test."""
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bgmat"))
+    if not os.path.isdir(root):
+        pytest.skip("sibling bgmat repo not found")
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    try:
+        from bgmat.systems.monatomic_water import MonatomicWaterEnergy
+    except Exception as e:
+        pytest.skip(f"bgmat not importable: {e}")
+    return MonatomicWaterEnergy
 
 
 def _x(n=8, L=6.0, key=0, batch=4):
@@ -122,8 +163,107 @@ class TestNumerics:
         assert e_tet > float(mw(cfg(130.0)))
 
 
+class TestLinearize:
+    """``linearize_below``: bgmat's training softening of the two-body core.
+
+    Below ``r_lin`` the two-body potential is its tangent line in r,
+    ``phi(r_lin) + (r - r_lin) * phi'(r_lin)``; the squared distance is first
+    clipped to ``min_distance**2``; the three-body term is untouched. Two
+    particles have no three-body term, so a pair isolates the two-body part.
+    """
+
+    LIN = 1.2   # bgmat's training value (Angstrom)
+
+    @pytest.mark.parametrize("r", [0.6, 0.9, 1.1])
+    def test_two_body_is_tangent_line_below(self, r):
+        """Analytic oracle: tangent line of the hand-written phi at r_lin.
+
+        Bug class: linearising in r**2 instead of r, or using the slope with
+        respect to r**2 (off by a factor 2 * r_lin).
+        """
+        mw = MonatomicWater(n_particles=2, box_length=20.0, beta=1.0,
+                            linearize_below=self.LIN)
+        u = float(-mw(_pair_config(r)))
+        expected = _phi2(self.LIN) + (r - self.LIN) * _dphi2(self.LIN)
+        assert math.isclose(u, expected, rel_tol=1e-4)
+
+    def test_unchanged_above_linearize_point(self):
+        """With every pair farther apart than r_lin the energy is the exact one."""
+        x = _lattice_config()                     # all pair distances > 3 Angstrom
+        exact = MonatomicWater(n_particles=8, box_length=10.0, beta=0.5)
+        soft = MonatomicWater(n_particles=8, box_length=10.0, beta=0.5,
+                              linearize_below=self.LIN)
+        assert jnp.allclose(soft(x), exact(x), rtol=1e-6)
+
+    def test_slope_below_equals_phi_prime_at_linearize_point(self):
+        """The force below r_lin is constant and equals phi'(r_lin): the
+        potential is C1 at r_lin. Checked with autodiff against the hand-written
+        finite-difference slope.
+        """
+        mw = MonatomicWater(n_particles=2, box_length=20.0, beta=1.0,
+                            linearize_below=self.LIN)
+        slope = jax.grad(lambda r: -mw(_pair_config(r)))
+        for r in (0.7, 1.0, 1.19):
+            assert math.isclose(float(slope(r)), _dphi2(self.LIN), rel_tol=1e-3)
+
+    def test_value_continuous_at_linearize_point(self):
+        """No jump at r_lin: values just below and above agree to O(delta)."""
+        mw = MonatomicWater(n_particles=2, box_length=20.0, beta=1.0,
+                            linearize_below=self.LIN)
+        delta = 1e-3
+        below = float(-mw(_pair_config(self.LIN - delta)))
+        above = float(-mw(_pair_config(self.LIN + delta)))
+        assert abs(below - above) < 2.0 * delta * abs(_dphi2(self.LIN)) + 1e-2
+
+    def test_clip_applies_before_linearisation(self):
+        """Below min_distance the energy is constant (bgmat clips r**2 first)."""
+        mw = MonatomicWater(n_particles=2, box_length=20.0, beta=1.0,
+                            min_distance=0.3, linearize_below=self.LIN)
+        at_clip = float(-mw(_pair_config(0.3)))
+        inside = float(-mw(_pair_config(0.1)))
+        assert math.isclose(inside, at_clip, rel_tol=1e-6)
+        expected = _phi2(self.LIN) + (0.3 - self.LIN) * _dphi2(self.LIN)
+        assert math.isclose(at_clip, expected, rel_tol=1e-4)
+
+    def test_gradient_finite_at_coincidence_training_config(self):
+        """bgmat's training settings (min_distance=0.01, linearize_below=1.2)
+        keep energy and gradient finite for exactly coincident particles, the
+        precondition for reverse-KL training."""
+        x = _lattice_config()
+        x = x.at[1].set(x[0])
+        mw = MonatomicWater(n_particles=8, box_length=10.0, beta=0.5,
+                            min_distance=0.01, linearize_below=self.LIN)
+        assert bool(jnp.isfinite(mw(x)))
+        assert bool(jnp.all(jnp.isfinite(jax.grad(mw)(x))))
+
+    @pytest.mark.parametrize("bad", [0.0, -1.0])
+    def test_nonpositive_linearize_below_raises(self, bad):
+        with pytest.raises(ValueError, match="linearize_below"):
+            MonatomicWater(n_particles=2, box_length=20.0, linearize_below=bad)
+
+
 class TestBgmatDifferential:
     """Lock the 2-body + 3-body form against bgmat's MonatomicWaterEnergy."""
+
+    @pytest.mark.parametrize("mind, lin", [(0.0, 1.2), (0.01, 1.2), (0.01, 2.0), (0.3, 1.2)])
+    def test_matches_bgmat_with_linearize(self, mind, lin):
+        """Reference-implementation oracle for the linearised two-body term.
+
+        One pair per sample is placed 0.58 Angstrom apart so the linear branch
+        is exercised; the remaining pairs are random.
+        """
+        MonatomicWaterEnergy = _bgmat_energy_class()
+        N, L, beta = 8, 6.0, 0.5
+        x = jax.random.uniform(jax.random.PRNGKey(3), (4, N, 3), minval=0.0, maxval=L)
+        x = x.at[:, 1].set(jnp.mod(x[:, 0] + jnp.array([0.5, 0.3, 0.0]), L))
+        d = np.array(x[:, 1] - x[:, 0])           # writable copy (jax arrays are read-only)
+        d -= L * np.round(d / L)                  # minimum image, as the energy sees it
+        assert np.all(np.linalg.norm(d, axis=-1) < lin)   # the linear branch is exercised
+        bg = MonatomicWaterEnergy(box_length=jnp.full((3,), L), min_distance=mind,
+                                  linearize_below=lin)
+        ours = MonatomicWater(n_particles=N, box_length=L, beta=beta,
+                              min_distance=mind, linearize_below=lin)
+        assert jnp.allclose(-ours(x) / beta, bg.energy(x), rtol=1e-4, atol=1e-2)
 
     def test_matches_bgmat_energy(self):
         import os

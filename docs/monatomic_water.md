@@ -22,6 +22,14 @@ $$
 
 The exponential cutoff factor and all its derivatives vanish as $\tilde r \to r_c^-$, so the energy is smooth with compact support.
 
+**Training softening (optional).** With `min_distance` $= r_{\min}$ and `linearize_below` $= r_\ell$ (both in Angstrom), each pair distance is first clipped to $\max(r, r_{\min})$. The pair potential $\phi$ is then replaced below $r_\ell$ by its tangent line in $r$:
+
+$$
+\phi_\ell(r) = \phi(r_\ell) + (r - r_\ell) \phi'(r_\ell) \text{ for } r < r_\ell.
+$$
+
+This is bgmat's training energy (`min_distance=0.01`, `linearize_below=1.2`). It removes the steep core that otherwise dominates reverse-KL gradients, is continuous with a continuous first derivative at $r_\ell$, and leaves the three-body term unchanged. Use the exact energy (both options off) for ESS and free-energy estimates.
+
 ### Three-body term
 
 For each centre $i$ and each unordered pair of neighbours $j < k$ within the cutoff,
@@ -49,6 +57,7 @@ The three-body term couples triplets, so the energy is not a sum of pair interac
 | `box_length` | required | Cubic box side (minimum-image PBC) |
 | `beta` | `1.0` | Inverse temperature, $1/kT$ in $1/(\text{kcal/mol})$ |
 | `min_distance` | `0.0` | Two-body squared distance clipped to `min_distance**2` (set $> 0$ for training) |
+| `linearize_below` | `None` | If set (Angstrom, $> 0$), two-body potential is linear in $r$ below it (training softening) |
 | `spatial_dim` | `3` | Spatial dimension per particle |
 
 Fixed mW constants (Molinero and Moore): $A = 7.0496$, $B = 0.6022$, $\gamma = 1.2$, $\varepsilon = 6.189$ kcal/mol, $\sigma = 2.3925$ Angstrom, $\lambda = 23.15$, $r_c = 1.8$.
@@ -72,6 +81,10 @@ log_ps = mw(xs)                     # (32,)
 
 # Training-stable variant (bounded two-body core)
 mw_train = MonatomicWater(n_particles=64, box_length=14.0, beta=0.5, min_distance=0.5)
+
+# bgmat's training energy: clip at 0.01 A, linear in r below 1.2 A
+mw_bgmat_train = MonatomicWater(n_particles=64, box_length=14.0, beta=0.5,
+                                min_distance=0.01, linearize_below=1.2)
 ```
 
 ## References
