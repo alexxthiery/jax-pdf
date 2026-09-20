@@ -32,11 +32,21 @@ Samplers must flip the entire field between these two modes, which becomes expon
 When $b = 0$, the distribution has exact $\mathbb{Z}_2$ symmetry ($\phi \to -\phi$).
 Nonzero $b$ breaks this symmetry, biasing toward one mode.
 
+Measured along the uniform field $\phi_i \equiv m$, the barrier between a mode and the symmetric point is
+
+$$
+\log p(\phi \equiv \pm 1) - \log p(\phi \equiv 0) = \frac{\beta}{4a}
+$$
+
+which does not depend on the number of sites: with $c = a d$ the local term is divided by the lattice size, so adding sites refines a fixed continuum field instead of raising the barrier.
+
 Difficulty scales with:
 
-- **`dim_grid`**: more sites means a larger barrier between modes
-- **`beta`**: higher inverse temperature sharpens modes and raises barriers
-- **`a`**: smaller coupling constant strengthens neighbor correlations, increasing the effective barrier
+- **`beta`**: the barrier grows in proportion, and the modes sharpen
+- **`a`**: the barrier grows as $1/a$, and neighbor correlations strengthen
+- **`dim_grid`**: sets the dimension of the sampling problem and its cost, not the height of the barrier
+
+When $b = 0$ the two modes carry exactly equal mass by symmetry, which is an exact check available to any sampler.
 
 ## Parameters
 

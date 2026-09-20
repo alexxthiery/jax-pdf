@@ -70,6 +70,19 @@ class TestPhiFour:
         lp_per = PhiFour(a=0.1, dim_grid=10, periodic=True)(x)
         assert not jnp.allclose(lp_dir, lp_per)
 
+    @pytest.mark.parametrize("a,beta,dim_grid", [(0.1, 1.0, 16), (0.1, 1.0, 64),
+                                                 (0.05, 1.0, 32), (0.1, 3.0, 32)])
+    def test_mode_barrier_is_beta_over_4a_at_every_lattice_size(self, a, beta, dim_grid):
+        """Barrier along the uniform field is beta/(4a), whatever the number of sites.
+
+        With c = a * dim_grid the local term is divided by the lattice size, so
+        adding sites refines a fixed continuum field instead of raising the
+        barrier (docs/phi_four.md, "Why it's hard").
+        """
+        dist = PhiFour(a=a, b=0.0, dim_grid=dim_grid, beta=beta, periodic=True)
+        barrier = dist(jnp.ones(dim_grid)) - dist(jnp.zeros(dim_grid))
+        assert float(barrier) == pytest.approx(beta / (4 * a), rel=1e-5)
+
     def test_periodic_translation_invariance(self):
         """Cyclic shift should preserve energy under periodic BCs."""
         key = jax.random.PRNGKey(4)
