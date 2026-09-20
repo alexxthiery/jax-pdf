@@ -12,6 +12,7 @@ from jax_pdf.muller_brown import MullerBrown
 from jax_pdf.neal_funnel import NealFunnel
 from jax_pdf.periodic_lennard_jones import PeriodicLennardJones
 from jax_pdf.phi_four import PhiFour
+from jax_pdf.phi_four_oracle import PhiFourChainOracle
 
 __version__ = "0.2.0"
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "NealFunnel",
     "PeriodicLennardJones",
     "PhiFour",
+    "PhiFourChainOracle",
 ]

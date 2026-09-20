@@ -29,13 +29,15 @@ pytest tests/test_banana.py -v
 jax_pdf/
   __init__.py           # re-exports: Banana2D, DoubleWell, DW4, HarmonicCrystal, LatticePhiFour, LGCP,
                         #   LennardJones, MonatomicWater, MullerBrown, NealFunnel, PeriodicLennardJones,
-                        #   PhiFour
+                        #   PhiFour, PhiFourChainOracle
   banana.py             # Banana2D distribution
   neal_funnel.py        # NealFunnel distribution
   log_gauss_pines.py    # LGCP distribution
   muller_brown.py       # MullerBrown distribution
   phi_four.py           # PhiFour distribution
   lattice_phi_four.py   # LatticePhiFour distribution (periodic lattice, any dimension)
+  phi_four_oracle.py    # PhiFourChainOracle: reference values for a 1D chain by
+                        #   transfer operator (NumPy; not a distribution)
   double_well.py        # DoubleWell distribution
   dw4.py                # DW4 distribution (4-particle double-well)
   lennard_jones.py      # LennardJones distribution (LJ13, LJ55; free cluster)

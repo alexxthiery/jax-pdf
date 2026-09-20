@@ -62,6 +62,11 @@ DW4, LennardJones, PeriodicLennardJones, MonatomicWater, LGCP, MullerBrown, and 
 | `MonatomicWater` | configurable | Monatomic (mW) water in a periodic box (Stillinger-Weber 2-body + 3-body tetrahedral-angle term) | [docs/monatomic_water.md](docs/monatomic_water.md) |
 | `HarmonicCrystal` | configurable | Einstein/harmonic crystal with analytic free energy (Boltzmann-generator sanity oracle) | [docs/harmonic_crystal.md](docs/harmonic_crystal.md) |
 
+### Reference values
+
+`PhiFourChainOracle` solves a one-dimensional phi-four chain by transfer operator, giving `log Z`, site marginals, two-point functions and exact draws with no Monte Carlo ([docs/phi_four_oracle.md](docs/phi_four_oracle.md)).
+It is the ground truth a sampler study needs while developing, before moving to a lattice where none is available.
+
 ## API reference
 
 Core methods shared by all distributions:

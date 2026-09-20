@@ -99,9 +99,10 @@ biased = PhiFour(a=0.1, b=0.1, dim_grid=100)
 
 ## Notes
 
-The normalizing constant is intractable.
-Calling `log_normalization()` raises `NotImplementedError`.
-No exact sampler is available.
+The normalizing constant is intractable in closed form.
+Calling `log_normalization()` raises `NotImplementedError`, and the distribution has no `sample` method.
+
+A chain is exactly solvable numerically, though: [`PhiFourChainOracle`](phi_four_oracle.md) gives $\log Z$, site marginals, two-point functions and exact draws by transfer operator, to a discretization error it reports.
 
 ## References
 

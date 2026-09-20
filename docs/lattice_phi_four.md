@@ -105,8 +105,10 @@ Use `PhiFour` for the continuum-normalized chain whose difficulty is fixed as si
 
 ## Notes
 
-The normalizing constant is intractable; `log_normalization()` raises `NotImplementedError`.
-No exact sampler is available.
+The normalizing constant is intractable; `log_normalization()` raises `NotImplementedError`, and there is no `sample` method.
+
+On a one-axis lattice, [`PhiFourChainOracle`](phi_four_oracle.md) solves the model numerically by transfer operator: $\log Z$, site marginals, two-point functions and exact draws.
+Nothing of the kind exists for two dimensions, which is worth weighing when choosing the lattice a study runs on.
 
 ## References
 
