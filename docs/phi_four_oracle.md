@@ -109,8 +109,8 @@ The weakest coupling that orders each length in that sweep:
 
 ## Cost and limits
 
-Building the operator is $O(\texttt{n\_grid}^2)$ in memory.
-A ring's $\log Z$ needs the eigenvalues of that matrix, which is $O(\texttt{n\_grid}^3)$; at `n_grid=2001` that is under a second.
+Building the operator costs memory quadratic in `n_grid`.
+A ring's $\log Z$ needs the eigenvalues of that matrix, which is cubic in `n_grid`; at `n_grid=2001` that is under a second.
 A Dirichlet chain needs only matrix-vector products.
 Sampling a ring caches the transfer powers, which costs `n_sites * n_grid**2` numbers; the call raises `MemoryError` naming `n_grid` rather than exhausting memory.
 
