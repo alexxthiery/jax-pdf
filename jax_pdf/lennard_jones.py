@@ -4,6 +4,8 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 
 @struct.dataclass
 class LennardJones:
@@ -53,10 +55,10 @@ class LennardJones:
         beta: Inverse temperature. Default: 1.0.
     """
 
-    n_particles: int = 13
+    n_particles: int = struct.field(pytree_node=False, default=13)
     """Number of particles."""
 
-    spatial_dim: int = 3
+    spatial_dim: int = struct.field(pytree_node=False, default=3)
     """Spatial dimension per particle (2D or 3D)."""
 
     epsilon: float = 1.0
@@ -68,7 +70,7 @@ class LennardJones:
     trap_scale: float = 1.0
     """Harmonic trap strength. Set to 0.0 to disable."""
 
-    trap_mode: str = 'individual'
+    trap_mode: str = struct.field(pytree_node=False, default='individual')
     """Trap mode: 'individual' penalizes each particle's distance from the
     origin; 'com' penalizes only the center of mass."""
 
@@ -84,13 +86,13 @@ class LennardJones:
             raise ValueError(
                 f"spatial_dim must be >= 1, got {self.spatial_dim}"
             )
-        if self.epsilon <= 0:
+        if is_concrete(self.epsilon) and self.epsilon <= 0:
             raise ValueError(
                 f"epsilon must be positive, got {self.epsilon}"
             )
-        if self.rm <= 0:
+        if is_concrete(self.rm) and self.rm <= 0:
             raise ValueError(f"rm must be positive, got {self.rm}")
-        if self.beta <= 0:
+        if is_concrete(self.beta) and self.beta <= 0:
             raise ValueError(f"beta must be positive, got {self.beta}")
         if self.trap_mode not in ('individual', 'com'):
             raise ValueError(

@@ -15,6 +15,8 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 # Molinero-Moore mW parameters (kcal/mol, Angstrom).
 MW_A = 7.049556277
 MW_B = 0.6022245584
@@ -48,15 +50,16 @@ class MonatomicWater:
             Default None (exact).
     """
 
-    n_particles: int
+    n_particles: int = struct.field(pytree_node=False)
     box_length: float
     beta: float = 1.0
     min_distance: float = 0.0
-    spatial_dim: int = 3
+    spatial_dim: int = struct.field(pytree_node=False, default=3)
     linearize_below: Optional[float] = None
 
     def __post_init__(self):
-        if self.linearize_below is not None and not self.linearize_below > 0:
+        if (self.linearize_below is not None and is_concrete(self.linearize_below)
+                and not self.linearize_below > 0):
             raise ValueError(
                 f"linearize_below must be positive or None, got {self.linearize_below}"
             )

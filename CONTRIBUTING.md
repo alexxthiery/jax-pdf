@@ -13,6 +13,8 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 
 @struct.dataclass
 class MyDist:
@@ -29,13 +31,20 @@ class MyDist:
     """
 
     param: float = 0.1
-    """Inline docstring for VS Code hover."""
+    """Inline docstring for VS Code hover. Numeric: a pytree child."""
+
+    n_sites: int = struct.field(pytree_node=False, default=8)
+    """Structural: static, so it can set shapes and drive control flow."""
 
     def __post_init__(self):
-        if self.param <= 0:
+        # A numeric parameter is a tracer when the distribution crosses a jit
+        # or vmap boundary, and a tracer cannot be compared.
+        if is_concrete(self.param) and self.param <= 0:
             raise ValueError(
                 f"param must be positive, got {self.param}"
             )
+        if self.n_sites < 1:            # static: concrete everywhere, no guard
+            raise ValueError(f"n_sites must be >= 1, got {self.n_sites}")
 
     @property
     def dim(self) -> int:
@@ -85,7 +94,9 @@ Requirements:
 - Use `@struct.dataclass` from Flax (not `@dataclass`)
 - `__call__` returns log probability, supports batch via `x[..., i]`
 - `dim` is a property, not a method
-- `log_normalization()` returns 0.0 for normalized distributions; raises `NotImplementedError` if intractable
+- Numeric parameters stay pytree children, so they can be swept with `vmap` and differentiated; sizes, flags and modes are `struct.field(pytree_node=False)`, so they stay concrete and may drive Python control flow
+- Guard validation of a numeric parameter with `is_concrete`, so the distribution can be passed to a jitted function. Validation of a static field needs no guard
+- `log_normalization()` returns a scalar, either a Python float or a JAX scalar; returns 0.0 for normalized distributions; raises `NotImplementedError` if intractable
 - `sample()` only if exact sampling is possible; omit otherwise
 - `__post_init__` validates parameters with clear error messages
 - Google-style docstrings with shape annotations
@@ -109,7 +120,7 @@ ALL_DISTS = [
 ]
 ```
 
-This automatically runs all shared interface tests (dim, call, batch, grad).
+This automatically runs all shared interface tests (dim, call, batch, grad, and the call with the distribution passed as a jit argument).
 
 Then create `tests/test_<name>.py` with distribution-specific tests:
 

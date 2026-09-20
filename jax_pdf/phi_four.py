@@ -4,6 +4,8 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 
 @struct.dataclass
 class PhiFour:
@@ -43,21 +45,21 @@ class PhiFour:
     b: float = 0.0
     """External field bias. Breaks Z2 symmetry when nonzero."""
 
-    dim_grid: int = 100
+    dim_grid: int = struct.field(pytree_node=False, default=100)
     """Number of lattice sites (= distribution dimension)."""
 
     beta: float = 1.0
     """Inverse temperature. Higher = sharper modes, harder sampling."""
 
-    periodic: bool = False
+    periodic: bool = struct.field(pytree_node=False, default=False)
     """False = Dirichlet BCs (zero boundary), True = periodic BCs."""
 
     def __post_init__(self):
-        if self.a <= 0:
+        if is_concrete(self.a) and self.a <= 0:
             raise ValueError(f"a must be positive, got {self.a}")
         if self.dim_grid < 2:
             raise ValueError(f"dim_grid must be >= 2, got {self.dim_grid}")
-        if self.beta <= 0:
+        if is_concrete(self.beta) and self.beta <= 0:
             raise ValueError(f"beta must be positive, got {self.beta}")
 
     @property

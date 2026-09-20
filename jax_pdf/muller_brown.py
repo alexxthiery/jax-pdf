@@ -4,6 +4,8 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 # Standard Muller-Brown coefficients (Muller & Brown, 1979).
 _A = jnp.array([-200.0, -100.0, -170.0, 15.0])
 _a = jnp.array([-1.0, -1.0, -6.5, 0.7])
@@ -44,7 +46,7 @@ class MullerBrown:
     """Inverse temperature. Higher = sharper modes, harder sampling."""
 
     def __post_init__(self):
-        if self.beta <= 0:
+        if is_concrete(self.beta) and self.beta <= 0:
             raise ValueError(f"beta must be positive, got {self.beta}")
 
     @property

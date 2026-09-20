@@ -4,6 +4,8 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 
 @struct.dataclass
 class DW4:
@@ -69,7 +71,7 @@ class DW4:
     trap_scale: float = 1.0
     """Harmonic trap strength. Set to 0.0 to disable."""
 
-    trap_mode: str = 'individual'
+    trap_mode: str = struct.field(pytree_node=False, default='individual')
     """Trap mode: 'individual' penalizes each particle's distance from the
     origin; 'com' penalizes only the center of mass."""
 
@@ -77,7 +79,7 @@ class DW4:
     """Inverse temperature."""
 
     def __post_init__(self):
-        if self.beta <= 0:
+        if is_concrete(self.beta) and self.beta <= 0:
             raise ValueError(f"beta must be positive, got {self.beta}")
         if self.trap_mode not in ('individual', 'com'):
             raise ValueError(

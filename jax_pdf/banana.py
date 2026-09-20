@@ -5,6 +5,8 @@ import jax.random as jr
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 
 @struct.dataclass
 class Banana2D:
@@ -33,7 +35,7 @@ class Banana2D:
     """Std dev of x1 around x0^2. Smaller = thinner banana."""
 
     def __post_init__(self):
-        if self.sigma <= 0:
+        if is_concrete(self.sigma) and self.sigma <= 0:
             raise ValueError(f"sigma must be positive, got {self.sigma}")
 
     @property

@@ -35,7 +35,7 @@ class DoubleWell:
         n_dims: Number of dimensions (must be even, >= 2). Default: 2.
     """
 
-    n_dims: int = 2
+    n_dims: int = struct.field(pytree_node=False, default=2)
     """Number of dimensions (must be even)."""
 
     def __post_init__(self):

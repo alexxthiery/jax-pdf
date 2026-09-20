@@ -12,6 +12,8 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 
 @struct.dataclass
 class PeriodicLennardJones:
@@ -51,8 +53,8 @@ class PeriodicLennardJones:
         shift_energy: Shift so u(cutoff) == 0. Default: True.
     """
 
-    n_particles: int = 256
-    spatial_dim: int = 3
+    n_particles: int = struct.field(pytree_node=False, default=256)
+    spatial_dim: int = struct.field(pytree_node=False, default=3)
     box_length: float = 5.848035476425733  # (256 / 1.28) ** (1/3)
     epsilon: float = 1.0
     sigma: float = 1.0
@@ -61,24 +63,24 @@ class PeriodicLennardJones:
     lambda_lj: float = 1.0
     min_distance: float = 0.0
     linearize_below: float = None
-    shift_energy: bool = True
+    shift_energy: bool = struct.field(pytree_node=False, default=True)
 
     def __post_init__(self):
         if self.n_particles < 2:
             raise ValueError(f"n_particles must be >= 2, got {self.n_particles}")
         if self.spatial_dim < 1:
             raise ValueError(f"spatial_dim must be >= 1, got {self.spatial_dim}")
-        if self.epsilon <= 0:
+        if is_concrete(self.epsilon) and self.epsilon <= 0:
             raise ValueError(f"epsilon must be positive, got {self.epsilon}")
-        if self.sigma <= 0:
+        if is_concrete(self.sigma) and self.sigma <= 0:
             raise ValueError(f"sigma must be positive, got {self.sigma}")
-        if self.box_length <= 0:
+        if is_concrete(self.box_length) and self.box_length <= 0:
             raise ValueError(f"box_length must be positive, got {self.box_length}")
-        if self.cutoff <= 0:
+        if is_concrete(self.cutoff) and self.cutoff <= 0:
             raise ValueError(f"cutoff must be positive, got {self.cutoff}")
-        if self.beta <= 0:
+        if is_concrete(self.beta) and self.beta <= 0:
             raise ValueError(f"beta must be positive, got {self.beta}")
-        if not (0.0 < self.lambda_lj <= 1.0):
+        if is_concrete(self.lambda_lj) and not (0.0 < self.lambda_lj <= 1.0):
             raise ValueError(f"lambda_lj must be in (0, 1], got {self.lambda_lj}")
 
     @classmethod

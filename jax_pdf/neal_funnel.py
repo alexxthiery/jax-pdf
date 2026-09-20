@@ -5,6 +5,8 @@ import jax.random as jr
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import is_concrete
+
 
 @struct.dataclass
 class NealFunnel:
@@ -28,7 +30,7 @@ class NealFunnel:
             Default: 3.0 (standard benchmark setting).
     """
 
-    dim: int = 10
+    dim: int = struct.field(pytree_node=False, default=10)
     """Dimensionality of the distribution."""
 
     sigma: float = 3.0
@@ -37,7 +39,7 @@ class NealFunnel:
     def __post_init__(self):
         if self.dim < 2:
             raise ValueError(f"dim must be >= 2, got {self.dim}")
-        if self.sigma <= 0:
+        if is_concrete(self.sigma) and self.sigma <= 0:
             raise ValueError(f"sigma must be positive, got {self.sigma}")
 
     def __call__(self, x: Array) -> Array:

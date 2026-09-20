@@ -56,10 +56,10 @@ class LGCP:
             Default: False.
     """
 
-    grid_dim: int = 40
+    grid_dim: int = struct.field(pytree_node=False, default=40)
     """Grid cells per dimension. Total dim = grid_dim^2."""
 
-    whitened: bool = False
+    whitened: bool = struct.field(pytree_node=False, default=False)
     """If True, use whitened (decorrelated) parameterization."""
 
     # Computed fields (set in __post_init__)

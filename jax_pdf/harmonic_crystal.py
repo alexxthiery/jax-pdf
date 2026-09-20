@@ -7,11 +7,12 @@ energy). With `box_length` set, displacements use the minimum-image convention
 (a periodic/torus harmonic crystal); the analytic `log Z` is the unbounded
 value, exact when the wells are narrow relative to the box.
 """
-import math
 
 import jax.numpy as jnp
 from flax import struct
 from jax import Array
+
+from jax_pdf._validation import is_concrete
 
 
 @struct.dataclass
@@ -37,11 +38,11 @@ class HarmonicCrystal:
                 f"HarmonicCrystal: positions must be (n_particles, spatial_dim), "
                 f"got shape {jnp.shape(self.positions)}."
             )
-        if self.spring_constant <= 0:
+        if is_concrete(self.spring_constant) and self.spring_constant <= 0:
             raise ValueError(
                 f"spring_constant must be positive, got {self.spring_constant}."
             )
-        if self.beta <= 0:
+        if is_concrete(self.beta) and self.beta <= 0:
             raise ValueError(f"beta must be positive, got {self.beta}.")
 
     @property
@@ -70,8 +71,8 @@ class HarmonicCrystal:
         u = 0.5 * self.spring_constant * jnp.sum(dx**2, axis=(-2, -1))
         return -self.beta * u
 
-    def log_normalization(self) -> float:
+    def log_normalization(self) -> Array:
         """Exact `log Z = (N*d/2) * log(2*pi / (beta*k))` (unbounded reference)."""
-        return 0.5 * self.dim * math.log(
-            2.0 * math.pi / (self.beta * self.spring_constant)
+        return 0.5 * self.dim * jnp.log(
+            2.0 * jnp.pi / (self.beta * self.spring_constant)
         )

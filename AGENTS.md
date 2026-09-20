@@ -41,9 +41,11 @@ jax_pdf/
   monatomic_water.py    # MonatomicWater (mW water, Stillinger-Weber, periodic; == bgmat)
   harmonic_crystal.py   # HarmonicCrystal (Einstein crystal, exact log Z)
   cox_process_utils.py  # utility functions for LGCP
+  _validation.py        # internal: is_concrete, the guard for validation under tracing
   finpines.csv          # Finnish pines dataset
 tests/
   test_interface.py     # shared interface tests (parametrized across all dists)
+  test_tracing.py       # static vs traced fields, sweeps, and validation under tracing
   test_<name>.py        # one file per distribution; the periodic targets
                         #   (periodic LJ, mW) include differential tests against
                         #   bgmat, skipped if ../bgmat is not importable
@@ -83,7 +85,9 @@ Why two tiers: particle distributions have a semantically meaningful particle ax
 - `__post_init__` validates parameters with "expected vs received" error messages
 - Comments explain *why*, not *what*
 - Pure functions, explicit state, no side effects
-- Compatible with `jit`, `vmap`, `grad` without surprises
+- Compatible with `jit`, `vmap`, `grad` without surprises, including passing a distribution itself as an argument to a jitted function
+- Numeric parameters are pytree children, so they can be swept with `vmap` and differentiated. Sizes, flags and modes are static (`struct.field(pytree_node=False)`), so they stay concrete and may drive Python control flow
+- Validation of a numeric parameter is guarded by `is_concrete` from `jax_pdf._validation`: it runs on concrete values and is skipped when the parameter is a tracer
 
 ## Markdown and math
 
