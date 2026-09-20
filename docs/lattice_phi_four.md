@@ -41,6 +41,17 @@ At $h = 0$ the action is invariant under $x \to -x$, so the two phases carry exa
 That gives an exact check for any sampler, and it also gives a cheap competing move (propose a global sign flip), which is worth remembering when this target is used to compare samplers.
 Nonzero $h$ breaks the symmetry and makes the phase masses unequal.
 
+## The parameters are redundant
+
+Writing $x = a y$ turns the action into
+
+$$
+S(x; u, a, \kappa, h) = S(y; u a^4, 1, \kappa a^2, h a)
+$$
+
+so $a$ is a choice of field units rather than a fourth degree of freedom: every model in this family is one with $a = 1$.
+A study that searches for a regime should fix $a = 1$ and vary $u$, $\kappa$ and $h$, and a study that prefers wells at $\pm a$ for readability should remember that $u$ and $\kappa$ carry the corresponding powers of $a$.
+
 ## Parameters
 
 | Parameter | Default | Description |

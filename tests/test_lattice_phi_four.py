@@ -136,6 +136,30 @@ class TestSymmetries:
         )
 
 
+class TestParameterRedundancy:
+
+    @pytest.mark.parametrize("u,a,kappa,h,shape", [
+        (0.7, 1.3, 2.1, 0.4, (4, 5)),
+        (2.0, 0.6, 0.3, -1.1, (6,)),
+        (0.2, 2.5, 1.0, 0.0, (3, 3, 3)),
+    ])
+    def test_the_well_location_is_a_choice_of_field_units(self, u, a, kappa, h, shape):
+        """
+        Claim: x = a y turns S(x; u, a, kappa, h) into S(y; u a^4, 1, kappa a^2, h a),
+        so the four parameters are three plus a scale, and a study may fix a = 1.
+        Bug: a term whose power of the field does not match its parameter, which
+        would break the scaling.
+        Oracle: the rescaled distribution evaluated at the rescaled field.
+        """
+        full = LatticePhiFour(u=u, a=a, kappa=kappa, h=h, lattice_shape=shape)
+        unit = LatticePhiFour(u=u * a**4, a=1.0, kappa=kappa * a**2, h=h * a,
+                              lattice_shape=shape)
+        x = np.random.default_rng(5).standard_normal((6, full.dim)).astype(np.float32) * a
+
+        np.testing.assert_allclose(np.asarray(full(jnp.asarray(x))),
+                                   np.asarray(unit(jnp.asarray(x / a))), rtol=1e-5)
+
+
 class TestGradient:
 
     def test_gradient_matches_the_analytic_expression(self):
