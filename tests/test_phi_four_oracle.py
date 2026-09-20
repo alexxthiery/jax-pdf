@@ -308,6 +308,114 @@ class TestSampler:
             oracle.sample(np.random.default_rng(0), 1)
 
 
+class TestGeneralLocalPotential:
+    """The tempered path of a chain stays in this family, with coefficients the
+    (u, a, h) form cannot express, which is what from_coefficients is for."""
+
+    def test_coefficients_reproduce_the_well_form(self):
+        """
+        Claim: u (x^2 - a^2)^2 - h x is the local potential with coefficients
+        (u, -2 u a^2, -h, u a^4), so the two constructors agree.
+        Bug: a factor or a sign in the expansion, or the constant dropped,
+        which would shift log Z by n_sites times it.
+        Oracle: the (u, a, h) constructor itself.
+        """
+        u, a, h, kappa, n = 0.8, 1.2, 0.3, 1.5, 6
+        direct = PhiFourChainOracle(u=u, a=a, kappa=kappa, h=h, n_sites=n,
+                                    periodic=True, n_grid=201, bound=3.0)
+        expanded = PhiFourChainOracle.from_coefficients(
+            quartic=u, quadratic=-2 * u * a**2, linear=-h, constant=u * a**4,
+            kappa=kappa, n_sites=n, periodic=True, n_grid=201, bound=3.0)
+
+        assert expanded.log_partition() == pytest.approx(direct.log_partition(), rel=1e-12)
+        np.testing.assert_allclose(expanded.site_marginal(), direct.site_marginal(), rtol=1e-12)
+
+    @pytest.mark.parametrize("periodic", [True, False])
+    def test_a_positive_quadratic_term_is_solved(self, periodic):
+        """
+        Claim: a chain whose local potential has a positive quadratic term, as
+        every early level of a tempered path does, is solved like any other.
+        The (u, a, h) form cannot express it, since -2 u a^2 is never positive.
+        Oracle: dense quadrature over every configuration of a three-site chain.
+        """
+        quartic, quadratic, linear, kappa, n = 0.4, 1.3, -0.2, 1.1, 3
+        n_grid, bound = 121, 3.0
+        grid, weights = trapezoid_grid(n_grid, bound)
+        oracle = PhiFourChainOracle.from_coefficients(
+            quartic=quartic, quadratic=quadratic, linear=linear, kappa=kappa,
+            n_sites=n, periodic=periodic, n_grid=n_grid, bound=bound)
+
+        x, w = dense_configurations(n, grid, weights)
+        local = np.sum(quartic * x**4 + quadratic * x**2 + linear * x, axis=-1)
+        if periodic:
+            bonds = np.sum((x - np.roll(x, -1, axis=-1)) ** 2, axis=-1)
+        else:
+            zero = np.zeros_like(x[..., :1])
+            bonds = np.sum(np.diff(np.concatenate([zero, x, zero], axis=-1), axis=-1) ** 2, axis=-1)
+        log_weight = np.log(w) - (local + kappa / 2 * bonds)
+        top = log_weight.max()
+        expected = top + np.log(np.sum(np.exp(log_weight - top)))
+
+        assert oracle.log_partition() == pytest.approx(expected, rel=1e-10)
+
+    def test_a_quartic_of_zero_needs_a_positive_quadratic(self):
+        """Without a quartic term the integral diverges unless the quadratic
+        confines it, so the constructor refuses the unbounded case."""
+        with pytest.raises(ValueError, match="quartic"):
+            PhiFourChainOracle.from_coefficients(quartic=0.0, quadratic=-1.0, linear=0.0,
+                                                 kappa=1.0, n_sites=4)
+        assert PhiFourChainOracle.from_coefficients(quartic=0.0, quadratic=1.0, linear=0.0,
+                                                    kappa=1.0, n_sites=4, n_grid=51).log_partition()
+
+    def test_pinned_ends_confine_where_a_ring_does_not(self):
+        """
+        Claim: with no local confinement the integral converges on a chain with
+        pinned ends, whose end bonds hold the field, and diverges on a ring,
+        whose uniform mode is free. The check must see the boundary condition.
+        Bug: one rule for both, which would either refuse a solvable chain (the
+        Gaussian chain that u = 0 leaves) or accept a divergent ring.
+        Oracle: the Gaussian chain's closed-form log Z, which exists only in
+        the first case.
+        """
+        chain = PhiFourChainOracle.from_coefficients(quartic=0.0, quadratic=0.0, linear=0.0,
+                                                     kappa=1.0, n_sites=4, periodic=False,
+                                                     n_grid=401, bound=8.0)
+        _, _, _, expected = gaussian_chain(4, 1.0, 0.0)
+
+        assert chain.log_partition() == pytest.approx(expected, rel=1e-6)
+        with pytest.raises(ValueError, match="positive definite"):
+            PhiFourChainOracle.from_coefficients(quartic=0.0, quadratic=0.0, linear=0.0,
+                                                 kappa=1.0, n_sites=4, periodic=True)
+
+    def test_the_check_weighs_the_local_term_as_the_energy_does(self):
+        """
+        Claim: the energy carries `quadratic * x^2` while a quadratic form
+        carries `x^2 / 2`, so the check adds twice the coefficient.
+        Bug: the factor dropped, which accepts a divergent chain. On four
+        pinned sites at kappa = 1 the Laplacian's smallest eigenvalue is 0.382,
+        so quadratic = -0.2 is unbounded (0.382 - 0.4 < 0) while a check
+        missing the factor would see 0.182 and accept it.
+        Oracle: the eigenvalue arithmetic, written out above.
+        """
+        with pytest.raises(ValueError, match="positive definite"):
+            PhiFourChainOracle.from_coefficients(quartic=0.0, quadratic=-0.2, linear=0.0,
+                                                 kappa=1.0, n_sites=4, periodic=False)
+        accepted = PhiFourChainOracle.from_coefficients(quartic=0.0, quadratic=-0.15, linear=0.0,
+                                                        kappa=1.0, n_sites=4, periodic=False,
+                                                        n_grid=401, bound=8.0)
+        assert np.isfinite(accepted.log_partition())
+
+    def test_the_report_keeps_the_coefficients(self):
+        """discretization_report rebuilds the chain, so it must carry them."""
+        oracle = PhiFourChainOracle.from_coefficients(quartic=0.4, quadratic=1.3, linear=-0.2,
+                                                      kappa=1.1, n_sites=4, n_grid=101, bound=3.0)
+
+        report = oracle.discretization_report()
+
+        assert report["log_partition"] == pytest.approx(oracle.log_partition(), rel=1e-12)
+        assert abs(report["refinement_change"]) < 1e-6
+
+
 class TestFromDistribution:
 
     def test_from_lattice_phi_four(self):

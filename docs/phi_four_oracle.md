@@ -46,6 +46,8 @@ Its law is checked by enumerating every configuration of a small chain, not by c
 | `discretization_report()` | the measured effect of resolution, extent, and the tail |
 | `grid` | the quadrature points |
 
+Alternate constructors: `from_distribution(dist, ...)` for a `PhiFour` or one-axis `LatticePhiFour`, and `from_coefficients(quartic, quadratic, linear, kappa, n_sites, constant=0.0, ...)` for an explicit local potential.
+
 Construction takes `u`, `a`, `kappa`, `h`, `n_sites`, `periodic`, `n_grid`, `bound`, or use `PhiFourChainOracle.from_distribution(dist, n_grid=..., bound=...)`.
 `u = 0` is allowed here, which leaves a Gaussian chain.
 
@@ -81,6 +83,27 @@ from jax_pdf import LatticePhiFour
 tilted = LatticePhiFour(u=0.5, a=1.0, kappa=2.0, h=0.05, lattice_shape=(24,))
 PhiFourChainOracle.from_distribution(tilted, n_grid=801).mean_field()   # 0.166
 ```
+
+## A level of a tempered path is a chain too
+
+Interpolating geometrically between a Gaussian and a phi-four chain stays inside this family, which is worth knowing if the chain is a target for a tempered or annealed method.
+Take the reference $N(0, \Sigma)$ with precision $\kappa \Delta + m I$, the same coupling as the target plus a mass, and the path
+
+$$
+\log \bar\pi_\lambda(x) = (1 - \lambda) \log N(x; 0, \Sigma) + \lambda \log \bar\pi_\star(x)
+$$
+
+Then every $\lambda$ is a chain with the same coupling $\kappa$ and local potential
+
+$$
+\lambda u x^4 + \left[\frac{(1-\lambda) m}{2} - 2 \lambda u a^2\right] x^2 - \lambda h x
+$$
+
+so `from_coefficients` solves it exactly, and a study has ground truth at every level of its path rather than only at the endpoint.
+The quadratic coefficient is positive near the reference end, which the well form $u(x^2 - a^2)^2$ cannot express, since $-2ua^2$ is never positive.
+That is what the general constructor is for.
+
+With a quartic coefficient of zero the chain is Gaussian, and the constructor accepts it only when what remains is positive definite: pinned ends confine the field through their end bonds, while a ring's uniform mode is free.
 
 ## Choosing a regime
 

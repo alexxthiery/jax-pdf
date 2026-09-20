@@ -14,6 +14,29 @@ from jax_pdf.phi_four import PhiFour
 _MAX_POWER_BYTES = 2e9
 
 
+def _confines(kappa, quadratic, n_sites, periodic):
+    """Whether the chain's quadratic form alone is positive definite.
+
+    The form is kappa times the lattice Laplacian of the boundary condition
+    plus twice the local quadratic coefficient on the diagonal, since the
+    energy carries x^2 while the form carries x^2 / 2.
+    """
+    if periodic:
+        # One bond per site, as the action counts them, so a ring of two sites
+        # carries two bonds between its two sites.
+        laplacian = np.zeros((n_sites, n_sites))
+        rows = np.arange(n_sites)
+        neighbour = np.roll(rows, -1)
+        np.add.at(laplacian, (rows, rows), 1.0)
+        np.add.at(laplacian, (neighbour, neighbour), 1.0)
+        np.add.at(laplacian, (rows, neighbour), -1.0)
+        np.add.at(laplacian, (neighbour, rows), -1.0)
+    else:
+        # Pinned ends add a bond at each end, giving the Dirichlet Laplacian.
+        laplacian = 2 * np.eye(n_sites) - np.eye(n_sites, k=1) - np.eye(n_sites, k=-1)
+    return bool(np.min(np.linalg.eigvalsh(kappa * laplacian + 2 * quadratic * np.eye(n_sites))) > 0)
+
+
 class PhiFourChainOracle:
     """Ground truth for a phi-four chain on a quadrature grid.
 
@@ -51,17 +74,23 @@ class PhiFourChainOracle:
 
     def __init__(self, u: float = 1.0, a: float = 1.0, kappa: float = 1.0, h: float = 0.0,
                  n_sites: int = 32, periodic: bool = True,
-                 n_grid: int = 2001, bound: float = 3.0):
+                 n_grid: int = 2001, bound: float = 3.0, local=None):
         """Build the transfer operator.
+
+        Args:
+            local: the local potential as coefficients
+                `(quartic, quadratic, linear, constant)`, replacing the one
+                `u`, `a` and `h` would give. `from_coefficients` is the
+                documented way to pass it.
 
         Raises:
             ValueError: on a negative u, a non-positive a or kappa, fewer than
-                two sites, a grid of fewer than three points, or a
-                non-positive bound.
+                two sites, a grid of fewer than three points, a non-positive
+                bound, or a local potential that does not confine the field.
         """
-        if u < 0:
+        if local is None and u < 0:
             raise ValueError(f"u must be non-negative, got {u}")
-        if a <= 0:
+        if local is None and a <= 0:
             raise ValueError(f"a must be positive, got {a}")
         if kappa <= 0:
             raise ValueError(f"kappa must be positive, got {kappa}")
@@ -76,6 +105,24 @@ class PhiFourChainOracle:
         self.n_sites, self.periodic = int(n_sites), bool(periodic)
         self.n_grid, self.bound = int(n_grid), float(bound)
 
+        # u (x^2 - a^2)^2 - h x expanded, so one code path serves both the
+        # well form and a level of a tempered path, whose quadratic term is
+        # positive at small lambda and which -2 u a^2 can never be.
+        self.local = ((float(u), -2.0 * float(u) * float(a) ** 2, -float(h), float(u) * float(a) ** 4)
+                      if local is None else tuple(float(c) for c in local))
+        quartic, quadratic = self.local[0], self.local[1]
+        if quartic < 0:
+            raise ValueError(f"the quartic coefficient must be non-negative, got {quartic}")
+        if quartic == 0 and not _confines(kappa, quadratic, int(n_sites), bool(periodic)):
+            # Without a quartic term the integral converges only if what is
+            # left is a positive definite quadratic form. Dirichlet ends
+            # contribute a bond each, so they confine where a ring does not.
+            raise ValueError(
+                "with a quartic coefficient of zero the remaining quadratic form must be "
+                f"positive definite, and kappa = {kappa}, quadratic = {quadratic} on "
+                f"{'a ring' if periodic else 'a chain with pinned ends'} of {n_sites} sites is not"
+            )
+
         self._grid = np.linspace(-self.bound, self.bound, self.n_grid)
         self._spacing = float(self._grid[1] - self._grid[0])
         self._weights = np.full(self.n_grid, self._spacing)
@@ -83,7 +130,9 @@ class PhiFourChainOracle:
 
         # The local factor is shifted to its maximum before exponentiating, so
         # a deep well cannot overflow; the shift returns once per site in log Z.
-        log_local = -self.u * (self._grid**2 - self.a**2) ** 2 + self.h * self._grid
+        quartic, quadratic, linear, constant = self.local
+        log_local = -(quartic * self._grid**4 + quadratic * self._grid**2
+                      + linear * self._grid + constant)
         self._shift = float(log_local.max())
         self._site = self._weights * np.exp(log_local - self._shift)
         self._bond = np.exp(-self.kappa / 2 * (self._grid[:, None] - self._grid[None, :]) ** 2)
@@ -96,6 +145,31 @@ class PhiFourChainOracle:
         self._eigen = None
         self._powers = None
         self._messages = None
+
+    @classmethod
+    def from_coefficients(cls, quartic: float, quadratic: float, linear: float,
+                          kappa: float, n_sites: int, constant: float = 0.0,
+                          **kwargs) -> "PhiFourChainOracle":
+        """Build the oracle from an explicit local potential.
+
+        The local term is `quartic x^4 + quadratic x^2 + linear x + constant`,
+        which is what a level of a tempered path looks like: a geometric bridge
+        from a Gaussian reference to a phi-four chain is itself a chain of this
+        family, with the coupling unchanged, the quartic scaled by the level,
+        and a quadratic term that is positive near the reference end. The well
+        form `u (x^2 - a^2)^2` cannot express that, since `-2 u a^2 <= 0`.
+
+        Args:
+            quartic, quadratic, linear, constant: the local potential.
+            kappa: nearest-neighbour coupling.
+            n_sites: number of sites.
+            **kwargs: `periodic`, `n_grid`, `bound`.
+
+        Returns:
+            An oracle for that chain.
+        """
+        return cls(kappa=kappa, n_sites=n_sites,
+                   local=(quartic, quadratic, linear, constant), **kwargs)
 
     @classmethod
     def from_distribution(cls, dist, **kwargs) -> "PhiFourChainOracle":
@@ -294,7 +368,8 @@ class PhiFourChainOracle:
 
     def _rebuilt(self, **changes) -> "PhiFourChainOracle":
         settings = dict(u=self.u, a=self.a, kappa=self.kappa, h=self.h, n_sites=self.n_sites,
-                        periodic=self.periodic, n_grid=self.n_grid, bound=self.bound)
+                        periodic=self.periodic, n_grid=self.n_grid, bound=self.bound,
+                        local=self.local)
         settings.update(changes)
         return PhiFourChainOracle(**settings)
 
