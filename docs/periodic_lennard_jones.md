@@ -7,7 +7,7 @@ A Boltzmann distribution over Lennard-Jones particles in a cubic periodic box, t
 The target density is
 
 $$
-p(x) \propto \exp(-\beta \, U(x)), \qquad U(x) = \sum_{i<j} u(r_{ij}),
+p(x) \propto \exp\left(-\beta \, U(x) \right), \qquad U(x) = \sum_{i \lt j} u(r_{ij}),
 $$
 
 where $r_{ij}$ is the minimum-image distance and $u$ is a soft-core, truncated, optionally shifted Lennard-Jones pair potential:
