@@ -66,6 +66,7 @@ DW4, LennardJones, PeriodicLennardJones, MonatomicWater, LGCP, MullerBrown, and 
 
 `PhiFourChainOracle` solves a one-dimensional phi-four chain by transfer operator, giving `log Z`, site marginals, two-point functions and exact draws with no Monte Carlo ([docs/phi_four_oracle.md](docs/phi_four_oracle.md)).
 It is the ground truth a sampler study needs while developing, before moving to a lattice where none is available.
+`examples/phi_four_hardness.py` uses it to map where a chain is genuinely two-moded: in one dimension that is decided by the chain length against the correlation length, not by the barrier height.
 
 ## API reference
 

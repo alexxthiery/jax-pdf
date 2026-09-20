@@ -204,6 +204,30 @@ class PhiFourChainOracle:
             moment = self._bond @ (self._site * moment)
         return float(np.sum(self._grid * left * moment) / np.sum(left * walked))
 
+    def correlation_length(self) -> float:
+        """Bulk correlation length of the chain, in lattice spacings.
+
+        The transfer operator's two largest eigenvalues give
+        xi = 1 / log(lambda_1 / lambda_2), and connected correlations decay as
+        exp(-r / xi). It is a property of the bulk, so it does not depend on
+        the boundary condition, and on a chain shorter than a few xi the
+        measured decay differs from it by finite-size effects.
+
+        A chain of n_sites much longer than xi breaks into domains and its
+        magnetization concentrates near zero; a chain shorter than xi behaves
+        as one domain and its magnetization is bimodal. In one dimension there
+        is no symmetry breaking in the long-chain limit, so this ratio, not the
+        barrier alone, decides whether the target is genuinely two-moded.
+
+        Returns:
+            The correlation length, or inf if the top two eigenvalues coincide.
+        """
+        values = np.sort(np.clip(np.linalg.eigvalsh(self._ring), 0.0, None))[::-1]
+        if values[1] <= 0:
+            return float("inf")
+        gap = np.log(values[0] / values[1])
+        return float("inf") if gap <= 0 else float(1.0 / gap)
+
     def sample(self, rng, n: int) -> np.ndarray:
         """Draw fields from the discretized chain, exactly.
 

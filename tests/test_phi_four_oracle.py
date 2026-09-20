@@ -190,6 +190,38 @@ class TestObservables:
                                oracle.site_marginal(site=2), rtol=1e-3)
 
 
+class TestCorrelationLength:
+
+    @pytest.mark.parametrize("u,kappa,expected_decay", [(1.0, 2.0, None), (2.0, 2.0, None)])
+    def test_matches_the_decay_of_the_correlation_function(self, u, kappa, expected_decay):
+        """
+        Claim: the correlation length is 1 / log(lambda_1 / lambda_2) from the
+        transfer spectrum, and it governs the decay of E[x_i x_{i+r}].
+        Bug: the wrong pair of eigenvalues, or a reciprocal the wrong way up.
+        Oracle: the decay measured from two_point at two separations, which
+        uses the eigenvectors and the pair joint, not the gap.
+        """
+        oracle = PhiFourChainOracle(u=u, a=1.0, kappa=kappa, h=0.0, n_sites=96,
+                                    periodic=True, n_grid=301, bound=3.0)
+
+        near, far = oracle.two_point(4), oracle.two_point(12)
+        from_decay = (12 - 4) / np.log(near / far)
+
+        assert oracle.correlation_length() == pytest.approx(from_decay, rel=1e-3)
+
+    def test_stronger_coupling_orders_the_chain(self):
+        """
+        Claim: the correlation length grows with the coupling, which is what
+        makes a chain of fixed length behave as one domain or as many.
+        Oracle: monotonicity, an invariant of the model rather than of the code.
+        """
+        lengths = [PhiFourChainOracle(u=1.0, a=1.0, kappa=kappa, h=0.0, n_sites=64,
+                                      periodic=True, n_grid=201, bound=3.0).correlation_length()
+                   for kappa in (1.0, 2.0, 4.0)]
+
+        assert lengths[0] < lengths[1] < lengths[2]
+
+
 class UniformStub:
     """An rng whose uniforms are prescribed, so a draw can be checked by hand."""
 

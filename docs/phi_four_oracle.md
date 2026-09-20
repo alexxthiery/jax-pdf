@@ -82,6 +82,31 @@ tilted = LatticePhiFour(u=0.5, a=1.0, kappa=2.0, h=0.05, lattice_shape=(24,))
 PhiFourChainOracle.from_distribution(tilted, n_grid=801).mean_field()   # 0.166
 ```
 
+## Choosing a regime
+
+A phi-four chain is not automatically a two-moded target, and the barrier does not decide whether it is one.
+In one dimension a domain wall costs a finite amount, so a chain much longer than the correlation length $\xi$ breaks into domains and its magnetization concentrates near zero; a chain shorter than $\xi$ behaves as one domain and its magnetization is bimodal.
+What matters is $n/\xi$, and `correlation_length()` gives $\xi$ exactly from the transfer spectrum.
+
+`examples/phi_four_hardness.py` sweeps $u$, $\kappa$ and $n$ at $a = 1$, $h = 0$ and reports $\xi$, $n/\xi$, the uniform-path barrier, and the magnetization's spread, tail mass and Binder cumulant from exact draws.
+Two rows from it, both on 64 sites:
+
+| $u$ | $\kappa$ | $\xi$ | $n/\xi$ | barrier | $P(\lvert m \rvert > 1/2)$ | Binder |
+|-----|-----------|--------|----------|---------|------------------------------|--------|
+| 2.0 | 1.0 | 1.9 | 33.8 | 128 | 0.021 | 0.065 |
+| 1.0 | 8.0 | 44.1 | 1.45 | 64 | 0.871 | 0.615 |
+
+The first has twice the barrier of the second and is unimodal; the second is the two-moded one.
+Across the whole sweep the Binder cumulant collapses onto $n/\xi$, reaching its two-phase value $2/3$ for $n \lesssim \xi$ and falling to zero for $n \gg \xi$.
+
+The weakest coupling that orders each length in that sweep:
+
+| $n$ | $u$ | $\kappa$ | $\xi$ | $n/\xi$ | $P(\lvert m \rvert > 1/2)$ | Binder |
+|-----|-----|-----------|--------|----------|------------------------------|--------|
+| 16 | 2.0 | 4.0 | 23.6 | 0.68 | 0.966 | 0.645 |
+| 32 | 1.0 | 8.0 | 44.1 | 0.73 | 0.968 | 0.644 |
+| 64 | 2.0 | 8.0 | 220.3 | 0.29 | 0.995 | 0.663 |
+
 ## Cost and limits
 
 Building the operator is $O(\texttt{n\_grid}^2)$ in memory.
