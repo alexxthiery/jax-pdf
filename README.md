@@ -54,6 +54,7 @@ DW4, LennardJones, PeriodicLennardJones, MonatomicWater, LGCP, MullerBrown, and 
 | `LGCP` | grid_dim^2 | Log Gaussian Cox Process on Finnish Pines | [docs/lgcp.md](docs/lgcp.md) |
 | `MullerBrown` | 2 | Multimodal potential energy surface | [docs/muller_brown.md](docs/muller_brown.md) |
 | `PhiFour` | configurable | 1D lattice field theory with double-well potential | [docs/phi_four.md](docs/phi_four.md) |
+| `LatticePhiFour` | configurable | Phi-four field on a periodic lattice in any dimension, in the action's parameters (2D lattice field theory) | [docs/lattice_phi_four.md](docs/lattice_phi_four.md) |
 | `DoubleWell` | configurable | Product of 2D double-well pairs ($2^{D/2}$ modes) | [docs/double_well.md](docs/double_well.md) |
 | `DW4` | 8 | Double-well pair potential over 4 particles in 2D | [docs/dw4.md](docs/dw4.md) |
 | `LennardJones` | configurable | Lennard-Jones cluster with harmonic confinement (LJ13, LJ55) | [docs/lennard_jones.md](docs/lennard_jones.md) |

@@ -5,8 +5,9 @@ import jax.numpy as jnp
 import pytest
 
 from jax_pdf import (
-    Banana2D, DoubleWell, DW4, HarmonicCrystal, LGCP, LennardJones,
-    MonatomicWater, MullerBrown, NealFunnel, PeriodicLennardJones, PhiFour,
+    Banana2D, DoubleWell, DW4, HarmonicCrystal, LatticePhiFour, LGCP,
+    LennardJones, MonatomicWater, MullerBrown, NealFunnel,
+    PeriodicLennardJones, PhiFour,
 )
 
 # A small crystal, spread out enough that the particle distributions below are
@@ -28,6 +29,8 @@ ALL_DISTS = [
     PeriodicLennardJones(n_particles=8, box_length=4.0),
     MonatomicWater(n_particles=8, box_length=8.0),
     HarmonicCrystal(positions=CRYSTAL_POSITIONS),
+    LatticePhiFour(lattice_shape=(4, 4)),
+    LatticePhiFour(u=0.5, a=1.0, kappa=2.0, h=0.1, lattice_shape=(3, 3, 3)),
 ]
 
 DISTS_WITH_SAMPLE = [
