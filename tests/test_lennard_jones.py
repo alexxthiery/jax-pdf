@@ -68,22 +68,6 @@ class TestLennardJones:
         with pytest.raises(ValueError, match="beta must be positive"):
             LennardJones(beta=-1.0)
 
-    def test_output_shape_single(self):
-        dist = LennardJones(n_particles=3, spatial_dim=2)
-        x = jnp.ones((3, 2))
-        assert dist(x).shape == ()
-
-    def test_output_shape_batch(self):
-        dist = LennardJones(n_particles=3, spatial_dim=2)
-        x = jnp.ones((5, 3, 2))
-        assert dist(x).shape == (5,)
-
-    def test_wrong_shape_raises(self):
-        """Legacy flat input is rejected with a clear error."""
-        dist = LennardJones(n_particles=3, spatial_dim=2)
-        with pytest.raises(ValueError, match="x.shape\\[-2:\\] == \\(3, 2\\)"):
-            dist(jnp.ones(6))
-
     def test_lj_minimum_at_rm(self):
         """Two particles at distance rm: LJ pair energy = -epsilon."""
         dist = LennardJones(
@@ -159,14 +143,6 @@ class TestLennardJones:
             n_particles=3, spatial_dim=2, beta=2.0
         )(x)
         assert jnp.allclose(lp2, 2.0 * lp1, atol=1e-6)
-
-    def test_gradient_finite_lj13(self):
-        dist = LennardJones()
-        key = jax.random.PRNGKey(2)
-        x = jax.random.normal(key, (13, 3))
-        grad = jax.grad(dist)(x)
-        assert grad.shape == (13, 3)
-        assert jnp.all(jnp.isfinite(grad))
 
     def test_gradient_finite_lj55(self):
         dist = LennardJones(n_particles=55)

@@ -130,6 +130,10 @@ This automatically runs the shared interface tests: dimensions, values, batches 
 It also passes the distribution as an unmapped `vmap` argument, with and without an enclosing JIT, to exercise pytree reconstruction.
 It also verifies that incorrect event shapes raise a diagnostic `ValueError` in both eager and JIT execution.
 Include parameterizations with different input-handling paths, such as both whitened and unwhitened LGCP.
+Do not multiply the shared matrix by extra sizes unless they exercise a distinct
+behavior. Keep shape-boundary cases in `test_validation.py` and avoid repeating
+shared shape, finiteness, or JIT smoke checks in distribution-specific modules.
+Use those modules for numerical oracles, parameter behavior, and named regressions.
 
 `tests/test_validation.py` checks the helper independently, including that it adds no JAX operations and permits symbolic batch dimensions when JAX export is available.
 The `DoubleWell` tests use analytic values, gradients, and Hessians to protect valid evaluations under JIT, and exercise a distribution carried through `lax.scan`.

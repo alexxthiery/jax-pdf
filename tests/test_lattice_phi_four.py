@@ -207,19 +207,6 @@ class TestInterface:
     def test_dim_is_the_number_of_sites(self, shape, dim):
         assert LatticePhiFour(lattice_shape=shape).dim == dim
 
-    def test_batch_shape(self):
-        dist = LatticePhiFour(lattice_shape=(3, 4))
-        x = jnp.zeros((7, 2, dist.dim))
-
-        assert dist(x).shape == (7, 2)
-
-    def test_wrong_input_size_raises(self):
-        """A field of the wrong length is a bug in the caller, not a reshape."""
-        dist = LatticePhiFour(lattice_shape=(3, 4))
-
-        with pytest.raises(ValueError, match=r"x.shape\[-1:\] == \(12,\)"):
-            dist(jnp.zeros(11))
-
     def test_log_normalization_raises(self):
         with pytest.raises(NotImplementedError):
             LatticePhiFour().log_normalization()

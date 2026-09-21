@@ -85,14 +85,6 @@ def _lattice_config(spacing=3.5, jitter=0.1, key=7):
 
 
 class TestInvariances:
-    def test_output_shape(self):
-        mw = MonatomicWater(n_particles=8, box_length=6.0)
-        assert mw(_x()).shape == (4,)
-
-    def test_wrong_shape_raises(self):
-        mw = MonatomicWater(n_particles=8, box_length=6.0)
-        with pytest.raises(ValueError, match=r"x.shape\[-2:\]"):
-            mw(jnp.zeros((8, 2)))
 
     def test_translation_invariance(self):
         """Minimum-image energy is invariant under a global shift."""
@@ -125,14 +117,6 @@ class TestNumerics:
         mw2 = MonatomicWater(n_particles=8, box_length=6.0, beta=2.0)
         assert jnp.allclose(mw2(x), 2.0 * mw1(x), atol=1e-4)
 
-    def test_gradient_finite(self):
-        """Exact potential: gradient is finite for a non-overlapping config."""
-        mw = MonatomicWater(n_particles=8, box_length=10.0, beta=0.5)
-        x = _lattice_config()
-        grad = jax.grad(mw)(x)
-        assert grad.shape == (8, 3)
-        assert bool(jnp.all(jnp.isfinite(grad)))
-
     def test_gradient_finite_with_overlap(self):
         """Training regime: a near-coincident pair would NaN the gradient via
         the 3-body sqrt and the 2-body core. With min_distance>0 (clips the
@@ -143,11 +127,6 @@ class TestNumerics:
         mw = MonatomicWater(n_particles=8, box_length=10.0, beta=0.5, min_distance=0.3)
         grad = jax.grad(mw)(x)
         assert bool(jnp.all(jnp.isfinite(grad)))
-
-    def test_jit(self):
-        mw = MonatomicWater(n_particles=8, box_length=6.0)
-        x = _x(batch=1)[0]
-        assert jnp.allclose(jax.jit(mw.__call__)(x), mw(x), atol=1e-4)
 
     def test_log_normalization_raises(self):
         with pytest.raises(NotImplementedError):

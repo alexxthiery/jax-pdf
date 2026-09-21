@@ -1,6 +1,4 @@
 """Tests for the HarmonicCrystal target (analytic / numeric oracles)."""
-import math
-
 import jax
 import jax.numpy as jnp
 import pytest
@@ -25,16 +23,6 @@ class TestHarmonicCrystal:
         hc = HarmonicCrystal(positions=s, spring_constant=2.0, beta=1.0)
         x = jnp.array([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
         assert jnp.allclose(hc(x), -1.0, atol=1e-6)   # -beta * (0.5*2*1)
-
-    def test_output_shape_batch(self):
-        hc = HarmonicCrystal(positions=_sites(4, 3))
-        x = jax.random.normal(jax.random.PRNGKey(1), (5, 4, 3))
-        assert hc(x).shape == (5,)
-
-    def test_wrong_shape_raises(self):
-        hc = HarmonicCrystal(positions=_sites(4, 3))
-        with pytest.raises(ValueError, match=r"x.shape\[-2:\]"):
-            hc(jnp.zeros((4, 2)))
 
     def test_log_normalization_matches_numeric_integral(self):
         """One DoF: log Z must equal log(integral exp(-beta*(k/2) u^2) du)."""
@@ -78,15 +66,3 @@ class TestHarmonicCrystal:
         hc1 = HarmonicCrystal(positions=s, spring_constant=2.0, beta=1.0)
         hc2 = HarmonicCrystal(positions=s, spring_constant=2.0, beta=2.0)
         assert jnp.allclose(hc2(x), 2.0 * hc1(x), atol=1e-6)
-
-    def test_gradient_finite(self):
-        hc = HarmonicCrystal(positions=_sites(8, 3), spring_constant=1.5, beta=0.5)
-        x = jax.random.normal(jax.random.PRNGKey(4), (8, 3))
-        grad = jax.grad(hc)(x)
-        assert grad.shape == (8, 3)
-        assert bool(jnp.all(jnp.isfinite(grad)))
-
-    def test_jit(self):
-        hc = HarmonicCrystal(positions=_sites(8, 3))
-        x = jax.random.normal(jax.random.PRNGKey(5), (8, 3))
-        assert jnp.allclose(jax.jit(hc.__call__)(x), hc(x), atol=1e-6)

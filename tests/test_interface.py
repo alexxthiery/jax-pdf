@@ -15,16 +15,18 @@ from jax_pdf import (
 # evaluated away from their singular configurations.
 CRYSTAL_POSITIONS = jnp.linspace(0.0, 2.0, 12).reshape(4, 3)
 
+# One representative per implementation path. Both LGCP coordinate systems and
+# PhiFour boundaries have different evaluation paths; changing only a dimension
+# does not justify repeating the full interface matrix. Dedicated model tests
+# retain DoubleWell's 2D factorization, LJ55 gradients and 3D lattice examples.
 ALL_DISTS = [
     Banana2D(sigma=0.1),
-    DoubleWell(n_dims=2),
     DoubleWell(n_dims=10),
     DW4(),
     NealFunnel(dim=5, sigma=3.0),
     LGCP(grid_dim=5),
     LGCP(grid_dim=5, whitened=True),
     LennardJones(n_particles=13),
-    LennardJones(n_particles=55),
     MullerBrown(beta=1.0),
     PhiFour(a=0.1, b=0.0, dim_grid=10),
     PhiFour(a=0.1, b=0.0, dim_grid=10, periodic=True),
@@ -32,7 +34,6 @@ ALL_DISTS = [
     MonatomicWater(n_particles=8, box_length=8.0),
     HarmonicCrystal(positions=CRYSTAL_POSITIONS),
     LatticePhiFour(lattice_shape=(4, 4)),
-    LatticePhiFour(u=0.5, a=1.0, kappa=2.0, h=0.1, lattice_shape=(3, 3, 3)),
 ]
 
 DISTS_WITH_SAMPLE = [
@@ -79,13 +80,6 @@ class TestInterface:
         assert lp.shape == ()
         assert jnp.isfinite(lp)
 
-    def test_call_batch(self, dist):
-        x = _test_point(dist)
-        x_batch = jnp.broadcast_to(x, (3,) + x.shape)
-        lp = dist(x_batch)
-        assert lp.shape == (3,)
-        assert jnp.all(jnp.isfinite(lp))
-
     def test_grad(self, dist):
         x = _test_point(dist)
         g = jax.grad(dist)(x)
@@ -122,24 +116,19 @@ class TestInterface:
         np.testing.assert_allclose(actual, expected, rtol=3e-6, atol=2e-5)
 
     @pytest.mark.parametrize("compiled", [False, True], ids=["eager", "jit"])
-    @pytest.mark.parametrize("invalid", [
-        "scalar", "empty", "singleton", "short", "long", "batched", "layout",
-    ])
+    @pytest.mark.parametrize("invalid", ["long", "layout"])
     def test_rejects_wrong_event_shape(self, dist, compiled, invalid):
         """Reject malformed events before broadcasting or indexing can hide them.
 
         The layout case preserves the number of values but moves event axes;
         checking total size would incorrectly accept it. Both LGCP forms are
         included because their linear algebra handles broadcasting differently.
+        The full rank/empty/singleton/batch boundary matrix belongs to
+        test_validation.py; these cases check each distribution uses the guard.
         """
         event_shape = _test_point(dist).shape
         shapes = {
-            "scalar": (),
-            "empty": event_shape[:-1] + (0,),
-            "singleton": event_shape[:-1] + (1,),
-            "short": event_shape[:-1] + (event_shape[-1] - 1,),
             "long": event_shape[:-1] + (event_shape[-1] + 1,),
-            "batched": (2, 3) + event_shape[:-1] + (event_shape[-1] + 1,),
             "layout": ((dist.dim,) if len(event_shape) == 2 else (dist.dim, 1)),
         }
         x = jnp.zeros(shapes[invalid])

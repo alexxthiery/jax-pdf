@@ -79,21 +79,6 @@ class TestConstruction:
             PeriodicLennardJones(lambda_lj=1.5)
 
 
-class TestShapes:
-    def test_output_shape_single(self):
-        dist = _hard_lj(4, box_length=10.0)
-        assert dist(jnp.zeros((4, 3))).shape == ()
-
-    def test_output_shape_batch(self):
-        dist = _hard_lj(4, box_length=10.0)
-        assert dist(jnp.zeros((5, 4, 3))).shape == (5,)
-
-    def test_wrong_shape_raises(self):
-        dist = _hard_lj(4, box_length=10.0)
-        with pytest.raises(ValueError, match=r"x.shape\[-2:\] == \(4, 3\)"):
-            dist(jnp.ones(12))
-
-
 class TestPairPotential:
     def test_zero_at_sigma(self):
         """Hard LJ pair energy is exactly 0 at r = sigma (large box, no cutoff effect)."""
@@ -181,20 +166,6 @@ class TestNumerics:
         )
         x = jnp.zeros((3, 3))  # all coincident
         assert jnp.isfinite(dist(x))
-
-    def test_gradient_finite(self):
-        dist = PeriodicLennardJones.from_density(256, density=1.28)
-        key = jax.random.PRNGKey(4)
-        x = jax.random.uniform(key, (256, 3), minval=0.0, maxval=dist.box_length)
-        grad = jax.grad(dist)(x)
-        assert grad.shape == (256, 3)
-        assert jnp.all(jnp.isfinite(grad))
-
-    def test_jit(self):
-        dist = _hard_lj(8, box_length=8.0, cutoff=3.0)
-        key = jax.random.PRNGKey(5)
-        x = jax.random.uniform(key, (8, 3), minval=0.0, maxval=8.0)
-        assert jnp.allclose(jax.jit(dist.__call__)(x), dist(x), atol=1e-6)
 
     def test_log_normalization_raises(self):
         with pytest.raises(NotImplementedError):

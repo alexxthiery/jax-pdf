@@ -36,21 +36,6 @@ class TestDW4:
         with pytest.raises(ValueError, match="beta must be positive"):
             DW4(beta=-1.0)
 
-    def test_output_shape_single(self):
-        dist = DW4()
-        x = jnp.ones((4, 2))
-        assert dist(x).shape == ()
-
-    def test_output_shape_batch(self):
-        dist = DW4()
-        x = jnp.ones((5, 4, 2))
-        assert dist(x).shape == (5,)
-
-    def test_wrong_shape_raises(self):
-        """Legacy flat input is rejected with a clear error."""
-        with pytest.raises(ValueError, match="x.shape\\[-2:\\] == \\(4, 2\\)"):
-            DW4()(jnp.ones(8))
-
     def test_permutation_invariance(self):
         """Swapping two particles does not change the energy."""
         dist = DW4()
@@ -112,14 +97,6 @@ class TestDW4:
         lp1 = DW4(beta=1.0)(x)
         lp2 = DW4(beta=2.0)(x)
         assert jnp.allclose(lp2, 2.0 * lp1, atol=1e-6)
-
-    def test_gradient_finite(self):
-        dist = DW4()
-        key = jax.random.PRNGKey(3)
-        x = jax.random.normal(key, (4, 2))
-        grad = jax.grad(dist)(x)
-        assert grad.shape == (4, 2)
-        assert jnp.all(jnp.isfinite(grad))
 
     def test_log_normalization_raises(self):
         with pytest.raises(NotImplementedError):

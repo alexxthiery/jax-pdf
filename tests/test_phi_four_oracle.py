@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from jax_pdf import LatticePhiFour, PhiFour
+from jax_pdf import phi_four_oracle as oracle_module
 from jax_pdf.phi_four_oracle import PhiFourChainOracle
 
 
@@ -300,12 +301,22 @@ class TestSampler:
         assert x.shape == (32, 5)
         assert np.all(np.abs(x) <= 3.0 + 1e-9)
 
-    def test_sampling_a_ring_guards_its_memory(self):
-        """A ring caches transfer powers, so a fine grid must fail loudly."""
-        oracle = PhiFourChainOracle(n_sites=64, periodic=True, n_grid=4001, bound=3.0)
+    @pytest.mark.parametrize("byte_limit", [399, 400])
+    def test_sampling_a_ring_guards_its_memory(self, monkeypatch, byte_limit):
+        """Two 5x5 float64 transfer powers need 400 bytes: exactly at the limit.
 
-        with pytest.raises(MemoryError, match="n_grid"):
-            oracle.sample(np.random.default_rng(0), 1)
+        Lower the budget, not the work performed by the sampler, to exercise
+        both sides of the guard without allocating large transfer matrices.
+        A broken guard therefore fails an assertion instead of risking an OOM.
+        """
+        monkeypatch.setattr(oracle_module, "_MAX_POWER_BYTES", byte_limit)
+        oracle = PhiFourChainOracle(n_sites=3, periodic=True, n_grid=5, bound=3.0)
+
+        if byte_limit < 400:
+            with pytest.raises(MemoryError, match="n_grid"):
+                oracle.sample(np.random.default_rng(0), 1)
+        else:
+            assert oracle.sample(np.random.default_rng(0), 1).shape == (1, 3)
 
 
 class TestGeneralLocalPotential:

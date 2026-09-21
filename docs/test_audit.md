@@ -6,9 +6,10 @@ The existing suite missed substantive numerical mistakes: **11 of 16 selected
 mutations survived**. The strengthened audit suite detected **all 16** and
 passed **724 tests with no skips**. This is evidence for those particular
 contracts, not an exhaustive mutation score or proof that the package is
-correct. The three API issues discovered by the audit have since been fixed;
-the suite now passes **775 tests with no skips**, with warnings treated as
-errors. Their regressions are described below.
+correct. The three API issues discovered by the audit were fixed, bringing
+the suite to 775 cases. A subsequent redundancy review reduced it to **519
+cases from 201 test functions**, all passing with no skips and warnings treated
+as errors. The same 16 selected faults remain detected after the reduction.
 
 The comparison starts from the working tree after event-shape validation and
 the removal of external bgmat test imports, with 697 passing tests. It is not a
@@ -69,6 +70,33 @@ cases, reducing the suite from 727 to 724 cases. The affected three sampler
 mutations were rechecked after replacement. Numerical tolerances now cover
 floating-point and quadrature error, not Monte Carlo uncertainty.
 
+## Removing redundant coverage
+
+The original 775 cases came from 226 functions. Shared interface checks
+accounted for 442 cases, including 238 repetitions of malformed-event checks.
+The reduced suite removes 25 duplicate smoke-test functions and keeps 14
+representative distribution configurations instead of 17. Both LGCP coordinate
+systems and both PhiFour boundaries remain because they exercise distinct
+paths; additional sizes remain in dedicated numerical tests.
+
+The full shape-boundary matrix stays in `test_validation.py`. Each distribution
+still rejects incorrect trailing lengths and layouts in eager and JIT modes,
+and particle counts are checked separately. Dedicated tests retain the original
+DoubleWell 10-versus-2 regression and the three API regressions below. Analytic
+values, gradients, independent scalar references, quadrature, and sampler
+transform checks were retained.
+
+The ring-sampler memory guard now uses a five-point grid and a lowered byte
+budget instead of a 4,001-point grid. It rejects a 399-byte budget and accepts
+400 bytes, the exact size of two 5x5 float64 transfer powers. Removing the guard
+or changing its comparison from `>` to `>=` each makes the new test fail.
+
+On the audit machine, the full run decreased from approximately 38 to 27 seconds;
+the two memory-boundary cases each took under 5 ms instead of about 3.2 seconds
+for the former large fixture. These are local observations, not benchmark
+guarantees. The primary gain is fewer repeated contracts to maintain. Mutation
+checks are a focused safeguard, not proof of identical coverage for every bug.
+
 ## Confirmed API issues and follow-up fixes
 
 The initial audit deliberately reported these implementation issues separately
@@ -110,9 +138,10 @@ distributions, with or without an enclosing JIT.
 
 The numeric guard now excludes that exact placeholder type, and HarmonicCrystal
 skips the placeholder's shape check. Concrete numeric validation and tracer
-shape validation remain active. The shared interface tests cover all
+shape validation remain active. The original regression exercised
 17 distribution configurations in both transformation modes; 24 of the 34
-cases failed before the fix. A separate negative control checks that malformed
+cases failed before the fix. The reduced suite retains 14 representative
+configurations in both modes. A separate negative control checks that malformed
 HarmonicCrystal positions still fail when passed through JIT.
 
 This handling follows [JAX's pytree initialization guidance](https://docs.jax.dev/en/latest/custom_pytrees.html#custom-pytrees-and-initialization-with-unexpected-values).
