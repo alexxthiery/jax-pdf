@@ -1,7 +1,6 @@
-"""Tests for MonatomicWater (Stillinger-Weber mW), incl. bgmat differential."""
+"""MonatomicWater tests with analytic and independent scalar energy oracles."""
+from itertools import combinations
 import math
-import os
-import sys
 
 import jax
 import jax.numpy as jnp
@@ -33,18 +32,41 @@ def _pair_config(r):
     return jnp.array([[5.0, 5.0, 5.0], [5.0 + r, 5.0, 5.0]])
 
 
-def _bgmat_energy_class():
-    """bgmat's MonatomicWaterEnergy from the sibling repo, or skip the test."""
-    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bgmat"))
-    if not os.path.isdir(root):
-        pytest.skip("sibling bgmat repo not found")
-    if root not in sys.path:
-        sys.path.insert(0, root)
-    try:
-        from bgmat.systems.monatomic_water import MonatomicWaterEnergy
-    except Exception as e:
-        pytest.skip(f"bgmat not importable: {e}")
-    return MonatomicWaterEnergy
+def _reference_energy(x, box_length, min_distance=0.0, linearize_below=None):
+    """Scalar float64 oracle for the equations in docs/monatomic_water.md.
+
+    Enumerate unique pairs and, for each centre, unordered neighbour pairs.
+    This deliberately uses neither production helpers/constants nor JAX's
+    vectorized distance tensors, masking, or autodiff. Fixtures have distinct
+    particles, so the physical angle needs no numerical norm regularization.
+    Clipping and linearization apply only to the two-body distances.
+    """
+    x = np.asarray(x, dtype=np.float64)
+
+    def displacement(i, j):
+        delta = x[j] - x[i]
+        return delta - box_length * np.rint(delta / box_length)
+
+    energy = 0.0
+    for i, j in combinations(range(len(x)), 2):
+        r = max(float(np.linalg.norm(displacement(i, j))), min_distance)
+        if linearize_below is not None and r < linearize_below:
+            energy += _phi2(linearize_below) + (r - linearize_below) * _dphi2(linearize_below)
+        else:
+            energy += _phi2(r)
+
+    cos0 = math.cos(math.radians(109.47))
+    for centre in range(len(x)):
+        neighbours = [j for j in range(len(x)) if j != centre]
+        for j, k in combinations(neighbours, 2):
+            a, b = displacement(centre, j), displacement(centre, k)
+            ra, rb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
+            if ra >= _CUT * _SIGMA or rb >= _CUT * _SIGMA:
+                continue
+            cosine = float(np.dot(a, b)) / (ra * rb)
+            radial = math.exp(1.2 / (ra / _SIGMA - _CUT) + 1.2 / (rb / _SIGMA - _CUT))
+            energy += 23.15 * _EPS * (cosine - cos0)**2 * radial
+    return energy
 
 
 def _x(n=8, L=6.0, key=0, batch=4):
@@ -164,7 +186,7 @@ class TestNumerics:
 
 
 class TestLinearize:
-    """``linearize_below``: bgmat's training softening of the two-body core.
+    """``linearize_below`` softens the two-body core for training.
 
     Below ``r_lin`` the two-body potential is its tangent line in r,
     ``phi(r_lin) + (r - r_lin) * phi'(r_lin)``; the squared distance is first
@@ -172,7 +194,7 @@ class TestLinearize:
     particles have no three-body term, so a pair isolates the two-body part.
     """
 
-    LIN = 1.2   # bgmat's training value (Angstrom)
+    LIN = 1.2   # Linearization distance (Angstrom).
 
     @pytest.mark.parametrize("r", [0.6, 0.9, 1.1])
     def test_two_body_is_tangent_line_below(self, r):
@@ -216,7 +238,7 @@ class TestLinearize:
         assert abs(below - above) < 2.0 * delta * abs(_dphi2(self.LIN)) + 1e-2
 
     def test_clip_applies_before_linearisation(self):
-        """Below min_distance the energy is constant (bgmat clips r**2 first)."""
+        """Below min_distance the energy is constant: clipping happens first."""
         mw = MonatomicWater(n_particles=2, box_length=20.0, beta=1.0,
                             min_distance=0.3, linearize_below=self.LIN)
         at_clip = float(-mw(_pair_config(0.3)))
@@ -226,7 +248,7 @@ class TestLinearize:
         assert math.isclose(at_clip, expected, rel_tol=1e-4)
 
     def test_gradient_finite_at_coincidence_training_config(self):
-        """bgmat's training settings (min_distance=0.01, linearize_below=1.2)
+        """Training settings (min_distance=0.01, linearize_below=1.2)
         keep energy and gradient finite for exactly coincident particles, the
         precondition for reverse-KL training."""
         x = _lattice_config()
@@ -242,52 +264,66 @@ class TestLinearize:
             MonatomicWater(n_particles=2, box_length=20.0, linearize_below=bad)
 
 
-class TestBgmatDifferential:
-    """Lock the 2-body + 3-body form against bgmat's MonatomicWaterEnergy."""
+@pytest.mark.parametrize("mind,lin", [
+    (0.0, None), (0.1, None), (0.8, None),
+    (0.0, 1.2), (0.01, 1.2), (0.01, 2.0), (0.3, 1.2), (0.8, 1.2),
+])
+class TestScalarReference:
+    """Independent sums protect pair/triplet counting and softening semantics."""
 
-    @pytest.mark.parametrize("mind, lin", [(0.0, 1.2), (0.01, 1.2), (0.01, 2.0), (0.3, 1.2)])
-    def test_matches_bgmat_with_linearize(self, mind, lin):
-        """Reference-implementation oracle for the linearised two-body term.
+    @staticmethod
+    def points():
+        # The first pair spans the periodic seam, 0.6 Angstrom apart: below
+        # every linearization point and the active 0.8-Angstrom clip. The last
+        # particle is outside all cutoffs; the others form nonzero triplets.
+        return np.array([[0.2, 0.3, 0.4], [11.6, 0.3, 0.4],
+                         [2.3, 1.5, 0.6], [2.8, 3.1, 1.0],
+                         [7.0, 7.5, 8.0]], dtype=np.float32)
 
-        One pair per sample is placed 0.58 Angstrom apart so the linear branch
-        is exercised; the remaining pairs are random.
-        """
-        MonatomicWaterEnergy = _bgmat_energy_class()
-        N, L, beta = 8, 6.0, 0.5
-        x = jax.random.uniform(jax.random.PRNGKey(3), (4, N, 3), minval=0.0, maxval=L)
-        x = x.at[:, 1].set(jnp.mod(x[:, 0] + jnp.array([0.5, 0.3, 0.0]), L))
-        d = np.array(x[:, 1] - x[:, 0])           # writable copy (jax arrays are read-only)
-        d -= L * np.round(d / L)                  # minimum image, as the energy sees it
-        assert np.all(np.linalg.norm(d, axis=-1) < lin)   # the linear branch is exercised
-        bg = MonatomicWaterEnergy(box_length=jnp.full((3,), L), min_distance=mind,
-                                  linearize_below=lin)
-        ours = MonatomicWater(n_particles=N, box_length=L, beta=beta,
+    def test_batched_energy_matches_scalar_sum(self, mind, lin):
+        points = self.points()
+        shifted = points.copy()
+        shifted[2] += [0.2, -0.1, 0.3]
+        batch = np.stack([points, shifted])
+        dist = MonatomicWater(n_particles=5, box_length=12.0, beta=0.7,
                               min_distance=mind, linearize_below=lin)
-        assert jnp.allclose(-ours(x) / beta, bg.energy(x), rtol=1e-4, atol=1e-2)
+        expected = [-0.7 * _reference_energy(x, 12.0, mind, lin) for x in batch]
 
-    def test_matches_bgmat_energy(self):
-        import os
-        import sys
+        # Float64 reference vs float32 JAX, including the steep repulsive core.
+        np.testing.assert_allclose(jax.jit(dist.__call__)(jnp.asarray(batch)),
+                                   expected, rtol=2e-5, atol=2e-4)
 
-        root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "bgmat")
-        )
-        if not os.path.isdir(root):
-            pytest.skip("sibling bgmat repo not found")
-        if root not in sys.path:
-            sys.path.insert(0, root)
-        try:
-            from bgmat.systems.monatomic_water import MonatomicWaterEnergy
-        except Exception as e:
-            pytest.skip(f"bgmat not importable: {e}")
+    def test_gradient_matches_reference_finite_differences(self, mind, lin):
+        x = self.points().astype(np.float64)
+        dist = MonatomicWater(n_particles=5, box_length=12.0, beta=0.7,
+                              min_distance=mind, linearize_below=lin)
+        expected = np.zeros_like(x)
+        # Perturb the float64 oracle, away from cutoff and clipping boundaries;
+        # do not finite-difference float32 energies with a tiny step.
+        for index in np.ndindex(x.shape):
+            delta = np.zeros_like(x)
+            delta[index] = 1e-4
+            expected[index] = -0.7 * (
+                _reference_energy(x + delta, 12.0, mind, lin)
+                - _reference_energy(x - delta, 12.0, mind, lin)
+            ) / 2e-4
+        actual = jax.grad(dist)(jnp.asarray(x, dtype=jnp.float32))
+        np.testing.assert_allclose(actual, expected, rtol=2e-4, atol=2e-3)
 
-        N, L, beta = 8, 6.0, 0.5
-        box = jnp.full((3,), L)
-        x = jax.random.uniform(jax.random.PRNGKey(1), (4, N, 3), minval=0.0, maxval=L)
-        for mind in (0.0, 0.1):
-            bg = MonatomicWaterEnergy(box_length=box, min_distance=mind)
-            ours = MonatomicWater(n_particles=N, box_length=L, beta=beta, min_distance=mind)
-            our_energy = -ours(x) / beta            # __call__ returns -beta*U
-            assert jnp.allclose(
-                our_energy, bg.energy(x), rtol=1e-3, atol=1e-2
-            ), f"mismatch vs bgmat, min_distance={mind}"
+
+def test_isolated_right_angle_has_known_three_body_energy():
+    """Only the central angle interacts: catch dropped or doubled triplets.
+
+    The two neighbours are sqrt(2)*r apart, beyond the cutoff. With a right
+    angle the angular factor is cos(theta_0)**2, giving an analytic reference
+    for both the scalar oracle and the full production energy.
+    """
+    r = 3.5
+    x = np.array([[0.0, 0.0, 0.0], [r, 0.0, 0.0], [0.0, r, 0.0]])
+    angular = (23.15 * _EPS * math.cos(math.radians(109.47))**2
+               * math.exp(2 * 1.2 / (r / _SIGMA - _CUT)))
+    expected = 2 * _phi2(r) + angular
+    assert angular > 0.01  # The fixture must detect a missing three-body term.
+    assert _reference_energy(x, 20.0) == pytest.approx(expected, rel=1e-12)
+    dist = MonatomicWater(n_particles=3, box_length=20.0)
+    assert float(-dist(jnp.asarray(x))) == pytest.approx(expected, rel=1e-5)

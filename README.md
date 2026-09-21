@@ -16,7 +16,7 @@ pip install -e .
 
 All distributions share a common core API. Input shape follows a two-tier convention:
 
-- **Generic distributions** (`Banana2D`, `NealFunnel`, `LGCP`, `MullerBrown`, `PhiFour`, `DoubleWell`) take flat input `(..., dim)`.
+- **Generic distributions** (`Banana2D`, `NealFunnel`, `LGCP`, `MullerBrown`, `PhiFour`, `LatticePhiFour`, `DoubleWell`) take flat input `(..., dim)`.
 - **Particle distributions** (`LennardJones`, `PeriodicLennardJones`, `MonatomicWater`, `HarmonicCrystal`, `DW4`) take structured input `(..., n_particles, spatial_dim)` because the particle axis is semantically meaningful and downstream consumers (normalising flows over particle systems) work in that shape natively. `dist.dim` still reports the flat DoF count (`n_particles * spatial_dim`); `n_particles` and `spatial_dim` are exposed as properties.
 
 ```python
@@ -44,6 +44,30 @@ samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
 ```
 
 DW4, LennardJones, PeriodicLennardJones, MonatomicWater, LGCP, MullerBrown, and PhiFour are unnormalized: no sampling, and `log_normalization()` raises `NotImplementedError`. `HarmonicCrystal` is the exception among the particle targets: its `log_normalization()` is analytic (it exists as a free-energy sanity oracle).
+
+### Input validation
+
+Every distribution checks that the trailing input axes match its configured event shape: `(dim,)` for generic distributions or `(n_particles, spatial_dim)` for particle distributions.
+The event shape describes one point; any leading axes describe batches, including empty batches.
+Incorrect shapes raise `ValueError` with the expected trailing shape and the full received shape, rather than being reshaped, broadcast into an event, or silently truncated.
+
+```python
+import jax
+from jax_pdf import DoubleWell
+
+dist = DoubleWell(n_dims=10)
+dist(jax.numpy.zeros((2, 3, 10)))  # output shape (2, 3)
+dist(jax.numpy.zeros(2))          # raises ValueError: expected trailing shape (10,)
+```
+
+Shape checks remain active under `jit`, `vmap`, and automatic differentiation.
+Under ordinary JIT they run while tracing, using shape metadata, and add no array operations to the compiled computation.
+They do not check array values or dtypes, and do not change the policy for validating numeric distribution parameters.
+
+For JAX export with symbolic shapes, batch dimensions may vary, but event dimensions must be provably equal to the configured sizes.
+For example, an exported `DoubleWell(n_dims=10)` accepts a symbolic input specification `(b, 10)`; an unconstrained `(b, 2*k)` is rejected.
+Use concrete event dimensions in exported input specifications.
+Calls that previously relied on accepting the wrong event size now raise `ValueError`.
 
 ## Distributions
 

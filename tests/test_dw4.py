@@ -8,6 +8,22 @@ from jax_pdf import DW4
 
 
 class TestDW4:
+    def test_nondefault_pair_offset_counts_six_unordered_pairs(self):
+        """A constant per-pair offset changes energy by 6*c for four particles."""
+        x = jnp.array([[0., 0.], [2., 0.], [0., 2.], [2., 2.]])
+        base = DW4(c=0.0, beta=0.7, trap_scale=0.0)
+        offset = DW4(c=0.6, beta=0.7, trap_scale=0.0)
+        assert float(offset(x) - base(x)) == pytest.approx(-0.7 * 6 * 0.6, abs=2e-5)
+
+    @pytest.mark.parametrize("mode,trap_energy", [("individual", 8.0), ("com", 4.0)])
+    def test_trap_strength_and_mode_have_known_energy(self, mode, trap_energy):
+        """A square has sum |x_i|^2=16 and four times |mean(x)|^2=8."""
+        x = jnp.array([[0., 0.], [2., 0.], [0., 2.], [2., 2.]])
+        free = DW4(trap_scale=0.0, beta=0.6)
+        trapped = DW4(trap_scale=0.7, trap_mode=mode, beta=0.6)
+        assert float(trapped(x) - free(x)) == pytest.approx(-0.6 * 0.7 * trap_energy,
+                                                           abs=2e-5)
+
     def test_dim(self):
         assert DW4().dim == 8
 

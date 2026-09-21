@@ -51,6 +51,12 @@ xs = jax.numpy.zeros((50, 10))
 log_ps = dw(xs)  # shape (50,)
 ```
 
+The final input axis must have length `n_dims`.
+For this 10-dimensional distribution, both `(10,)` and `(50, 10)` are valid, while `(2,)` raises `ValueError` even though it contains a complete coordinate pair.
+Any leading batch axes are preserved: `(2, 3, 10)` produces output of shape `(2, 3)`.
+This keeps density evaluation consistent with the dimension used by `sample()` and `log_normalization()`.
+The check also runs during JAX tracing and adds no array operations to the compiled computation; see [input validation](../README.md#input-validation) for symbolic-shape behavior.
+
 Varying difficulty:
 
 ```python

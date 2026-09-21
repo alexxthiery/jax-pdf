@@ -41,18 +41,18 @@ jax_pdf/
   double_well.py        # DoubleWell distribution
   dw4.py                # DW4 distribution (4-particle double-well)
   lennard_jones.py      # LennardJones distribution (LJ13, LJ55; free cluster)
-  periodic_lennard_jones.py  # PeriodicLennardJones (periodic LJ solid, minimum image; == bgmat)
-  monatomic_water.py    # MonatomicWater (mW water, Stillinger-Weber, periodic; == bgmat)
+  periodic_lennard_jones.py  # PeriodicLennardJones (periodic LJ solid, minimum image)
+  monatomic_water.py    # MonatomicWater (mW water, Stillinger-Weber, periodic)
   harmonic_crystal.py   # HarmonicCrystal (Einstein crystal, exact log Z)
   cox_process_utils.py  # utility functions for LGCP
-  _validation.py        # internal: is_concrete, the guard for validation under tracing
+  _validation.py        # internal: event shape checks and concrete parameter validation
   finpines.csv          # Finnish pines dataset
 tests/
   test_interface.py     # shared interface tests (parametrized across all dists)
   test_tracing.py       # static vs traced fields, sweeps, and validation under tracing
-  test_<name>.py        # one file per distribution; the periodic targets
-                        #   (periodic LJ, mW) include differential tests against
-                        #   bgmat, skipped if ../bgmat is not importable
+  test_<name>.py        # one file per distribution; periodic LJ and mW include
+                        #   independent scalar energy and finite-difference
+                        #   gradient references, with no sibling repo imports
 docs/
   <name>.md             # per-distribution documentation, one file per distribution
 ```
@@ -64,7 +64,7 @@ Each distribution is a `@struct.dataclass` (Flax) with a two-tier interface:
 ```python
 dist = SomeDistribution(param=value)
 
-# Generic distributions (Banana2D, NealFunnel, LGCP, MullerBrown, PhiFour, DoubleWell):
+# Generic distributions (Banana2D, NealFunnel, LGCP, MullerBrown, PhiFour, LatticePhiFour, DoubleWell):
 log_p = dist(x)                    # input (..., dim) -> output (...)
 
 # Particle distributions (LennardJones, DW4, PeriodicLennardJones, MonatomicWater, HarmonicCrystal):
@@ -92,6 +92,9 @@ Why two tiers: particle distributions have a semantically meaningful particle ax
 - Compatible with `jit`, `vmap`, `grad` without surprises, including passing a distribution itself as an argument to a jitted function
 - Numeric parameters are pytree children, so they can be swept with `vmap` and differentiated. Sizes, flags and modes are static (`struct.field(pytree_node=False)`), so they stay concrete and may drive Python control flow
 - Validation of a numeric parameter is guarded by `is_concrete` from `jax_pdf._validation`: it runs on concrete values and is skipped when the parameter is a tracer
+- Every `__call__` uses `check_event_shape` from `jax_pdf._validation` for its documented trailing axes. Shape metadata remains available under tracing, so this check is never guarded by `is_concrete`; leading batch axes stay unrestricted
+- Prefer deterministic sampler tests (controlled innovations, probability weights, quadrature, exact enumeration). Avoid Monte Carlo statistical assertions in the default unit suite; seeded inputs for algebraic or shape/support checks are fine
+- Tests must run without sibling repositories or optional external reference implementations. Use analytic or independent scalar numerical oracles; do not modify `sys.path` to import another checkout or skip comparisons when it is absent
 
 ## Markdown and math
 

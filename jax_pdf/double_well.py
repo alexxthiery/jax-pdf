@@ -5,6 +5,8 @@ import jax.random as jr
 from flax import struct
 from jax import Array
 
+from jax_pdf._validation import check_event_shape
+
 # Precompute 1D grid and weights for the x-marginal
 _GRID_SIZE = 1_000_000
 _X_GRID = jnp.linspace(-6.0, 6.0, _GRID_SIZE)
@@ -56,7 +58,11 @@ class DoubleWell:
 
         Returns:
             Unnormalized log-density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape (n_dims,).
         """
+        check_event_shape(x, (self.dim,))
         x_even = x[..., 0::2]
         x_odd = x[..., 1::2]
         return jnp.sum(

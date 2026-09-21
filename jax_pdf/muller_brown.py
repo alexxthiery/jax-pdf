@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 # Standard Muller-Brown coefficients (Muller & Brown, 1979).
 _A = jnp.array([-200.0, -100.0, -170.0, 15.0])
@@ -61,7 +61,11 @@ class MullerBrown:
 
         Returns:
             Unnormalized log-density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape (2,).
         """
+        check_event_shape(x, (self.dim,))
         dx = x[..., 0, None] - _x0  # (..., 4)
         dy = x[..., 1, None] - _y0  # (..., 4)
         exponent = _a * dx**2 + _b * dx * dy + _c * dy**2

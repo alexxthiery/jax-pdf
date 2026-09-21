@@ -1,10 +1,48 @@
-"""Tests for PeriodicLennardJones distribution."""
+"""Periodic Lennard-Jones tests with analytic and scalar reference oracles."""
+
+from itertools import combinations
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from jax_pdf import PeriodicLennardJones
+
+
+def _reference_energy(x, box_length, cutoff, epsilon, sigma, lambda_lj,
+                      min_distance, linearize_below, shift_energy):
+    """Float64 pair sum of the potential in docs/periodic_lennard_jones.md.
+
+    Scalar distances, explicit pair enumeration and an analytic radial slope
+    provide an oracle independent of the JAX distance matrix and autodiff.
+    Clipping precedes linearization and truncation; the shift is the original
+    soft-core potential at the cutoff. No production energy helper is used.
+    """
+    def potential(r):
+        g = (r / sigma)**6 + 0.5 * (1.0 - lambda_lj)**2
+        return 4 * lambda_lj * epsilon * (1 / g**2 - 1 / g)
+
+    def slope(r):
+        g = (r / sigma)**6 + 0.5 * (1.0 - lambda_lj)**2
+        dg = 6 * r**5 / sigma**6
+        return 4 * lambda_lj * epsilon * dg * (g - 2) / g**3
+
+    x = np.asarray(x, dtype=np.float64)
+    shift = potential(cutoff) if shift_energy else 0.0
+    energy = 0.0
+    for i, j in combinations(range(len(x)), 2):
+        delta = x[j] - x[i]
+        delta -= box_length * np.rint(delta / box_length)
+        r = max(float(np.linalg.norm(delta)), min_distance)
+        if r > cutoff:
+            continue
+        if linearize_below is not None and r < linearize_below:
+            pair = potential(linearize_below) + (r - linearize_below) * slope(linearize_below)
+        else:
+            pair = potential(r)
+        energy += pair - shift
+    return energy
 
 
 def _hard_lj(n_particles, box_length, **kw):
@@ -163,55 +201,64 @@ class TestNumerics:
             PeriodicLennardJones().log_normalization()
 
 
-class TestBgmatDifferential:
-    """Lock the contract: our energy == bgmat's LennardJonesEnergy bit-for-bit.
+@pytest.mark.parametrize("lam,shift,mind,lin", [
+    (1.0, True, 0.0, None), (1.0, False, 0.0, None),
+    (0.5, True, 0.0, None), (1.0, True, 0.1, None),
+    (1.0, True, 0.0, 0.8), (1.0, True, 0.7, 0.8),
+    (0.5, False, 0.7, 0.8),
+])
+class TestScalarReference:
+    """Pair counting, periodicity and softening checked without external code."""
 
-    Strongest available oracle (independent reference implementation). Skipped
-    when the sibling bgmat repo or its deps are unavailable, so the suite stays
-    green in minimal environments.
-    """
+    @staticmethod
+    def points():
+        # Pair 0-1 has minimum-image distance 0.6, exercising both the active
+        # 0.7 clip and the 0.8 linearization. Other pairs straddle the cutoff.
+        return np.array([[0.2, 0.3, 0.4], [3.6, 0.3, 0.4],
+                         [1.4, 1.2, 0.8], [2.2, 2.6, 2.9]], dtype=np.float32)
 
-    def test_matches_bgmat_energy(self):
-        import os
-        import sys
+    @staticmethod
+    def parameters(lam, shift, mind, lin):
+        return dict(box_length=4.0, cutoff=1.8, epsilon=1.3, sigma=0.9,
+                    lambda_lj=lam, shift_energy=shift, min_distance=mind,
+                    linearize_below=lin)
 
-        bgmat_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "bgmat")
-        )
-        if not os.path.isdir(bgmat_root):
-            pytest.skip("sibling bgmat repo not found")
-        if bgmat_root not in sys.path:
-            sys.path.insert(0, bgmat_root)
-        try:
-            from bgmat.systems.lennard_jones import LennardJonesEnergy
-        except Exception as e:  # missing chex / heavy deps absent
-            pytest.skip(f"bgmat not importable: {e}")
+    def test_batched_energy_matches_scalar_sum(self, lam, shift, mind, lin):
+        parameters = self.parameters(lam, shift, mind, lin)
+        x = self.points()
+        perturbed = x.copy()
+        perturbed[2] += [0.2, -0.1, 0.3]
+        batch = np.stack([x, perturbed])
+        dist = PeriodicLennardJones(n_particles=4, beta=0.7, **parameters)
+        expected = [-0.7 * _reference_energy(y, **parameters) for y in batch]
 
-        N, L, B = 8, 4.0, 0.5
-        box = jnp.full((3,), L)
-        x = jax.random.uniform(jax.random.PRNGKey(0), (5, N, 3), minval=0.0, maxval=L)
-        # (cutoff, lambda_lj, shift, min_distance, linearize_below)
-        cases = [
-            (1.8, 1.0, True, 0.0, None),
-            (1.8, 1.0, False, 0.0, None),
-            (1.8, 0.5, True, 0.0, None),
-            (1.8, 1.0, True, 0.1, None),
-            (1.8, 1.0, True, 0.0, 0.8),
-        ]
-        for cutoff, lam, shift, mind, lin in cases:
-            bg = LennardJonesEnergy(
-                cutoff=cutoff, box_length=box, epsilon=1.0, sigma=1.0,
-                min_distance=mind, lambda_lj=lam, linearize_below=lin,
-                shift_energy=shift,
-            )
-            ours = PeriodicLennardJones(
-                n_particles=N, spatial_dim=3, box_length=L, cutoff=cutoff, beta=B,
-                lambda_lj=lam, min_distance=mind, linearize_below=lin,
-                shift_energy=shift,
-            )
-            our_energy = -ours(x) / B            # __call__ returns -beta*U
-            assert jnp.allclose(our_energy, bg.energy(x), rtol=1e-4, atol=1e-3), (
-                f"mismatch vs bgmat for case "
-                f"cutoff={cutoff} lambda={lam} shift={shift} "
-                f"min_distance={mind} linearize_below={lin}"
-            )
+        np.testing.assert_allclose(jax.jit(dist.__call__)(jnp.asarray(batch)),
+                                   expected, rtol=2e-5, atol=2e-4)
+
+    def test_gradient_matches_reference_finite_differences(self, lam, shift, mind, lin):
+        parameters = self.parameters(lam, shift, mind, lin)
+        x = self.points().astype(np.float64)
+        dist = PeriodicLennardJones(n_particles=4, beta=0.7, **parameters)
+        expected = np.zeros_like(x)
+        # Float64 differences away from switching surfaces, compared with
+        # float32 autodiff; the absolute tolerance covers near-zero forces.
+        for index in np.ndindex(x.shape):
+            delta = np.zeros_like(x)
+            delta[index] = 1e-4
+            expected[index] = -0.7 * (
+                _reference_energy(x + delta, **parameters)
+                - _reference_energy(x - delta, **parameters)
+            ) / 2e-4
+        actual = jax.grad(dist)(jnp.asarray(x, dtype=jnp.float32))
+        np.testing.assert_allclose(actual, expected, rtol=2e-4, atol=2e-3)
+
+
+def test_scalar_reference_has_known_lj_minimum():
+    """Anchor the reference itself: the unshifted hard-LJ minimum is -eps."""
+    sigma, epsilon = 0.9, 1.3
+    x = [[0.0, 0.0, 0.0], [2**(1/6) * sigma, 0.0, 0.0]]
+    energy = _reference_energy(x, box_length=10.0, cutoff=4.0,
+                               epsilon=epsilon, sigma=sigma, lambda_lj=1.0,
+                               min_distance=0.0, linearize_below=None,
+                               shift_energy=False)
+    assert energy == pytest.approx(-epsilon, rel=1e-12)

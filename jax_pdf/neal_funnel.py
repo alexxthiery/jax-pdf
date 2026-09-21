@@ -5,7 +5,7 @@ import jax.random as jr
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 
 @struct.dataclass
@@ -50,7 +50,11 @@ class NealFunnel:
 
         Returns:
             Log probability density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape (dim,).
         """
+        check_event_shape(x, (self.dim,))
         x0 = x[..., 0]
         x_rest = x[..., 1:]
 

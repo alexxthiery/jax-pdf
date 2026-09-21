@@ -2,12 +2,43 @@
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from jax_pdf import LennardJones
 
 
 class TestLennardJones:
+    @pytest.mark.parametrize("relative_distance", [1.0, 1.25, 2.0])
+    def test_nondefault_length_scale_value_and_force(self, relative_distance):
+        """Default rm=1 cannot detect an implementation that ignores rm.
+
+        A single pair isolates the 12-6 potential and its analytic derivative.
+        The tiny squared-distance regularizer changes these values below the
+        absolute tolerance at the chosen nonzero distances.
+        """
+        rm, epsilon, beta = 1.4, 1.8, 0.7
+        r = rm * relative_distance
+        dist = LennardJones(n_particles=2, rm=rm, epsilon=epsilon, beta=beta,
+                            trap_scale=0.0)
+        x = jnp.array([[0., 0., 0.], [r, 0., 0.]])
+        q6 = relative_distance**-6
+        expected = -beta * epsilon * (q6**2 - 2 * q6)
+        slope = 12 * epsilon / r * (q6 - q6**2)
+        value, gradient = jax.jit(jax.value_and_grad(dist))(x)
+        assert float(value) == pytest.approx(expected, rel=2e-5, abs=2e-6)
+        np.testing.assert_allclose(gradient, [[beta * slope, 0, 0], [-beta * slope, 0, 0]],
+                                   rtol=2e-5, atol=3e-6)
+
+    @pytest.mark.parametrize("mode,trap_energy", [("individual", 5.0), ("com", 4.0)])
+    def test_trap_modes_have_known_energy(self, mode, trap_energy):
+        """Two points at (+/-1,2) distinguish individual and COM confinement."""
+        x = jnp.array([[1., 2.], [-1., 2.]])
+        free = LennardJones(n_particles=2, spatial_dim=2, trap_scale=0.0, beta=0.6)
+        trapped = free.replace(trap_scale=0.7, trap_mode=mode)
+        assert float(trapped(x) - free(x)) == pytest.approx(-0.6 * 0.7 * trap_energy,
+                                                           abs=2e-6)
+
     def test_dim_lj13(self):
         assert LennardJones().dim == 39
 

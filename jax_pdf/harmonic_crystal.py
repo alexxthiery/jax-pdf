@@ -12,7 +12,7 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 
 @struct.dataclass
@@ -58,13 +58,20 @@ class HarmonicCrystal:
         return self.n_particles * self.spatial_dim
 
     def __call__(self, x: Array) -> Array:
-        """Unnormalized log-density, `x` shape `(..., n_particles, spatial_dim)`."""
+        """Evaluate unnormalized log-density.
+
+        Args:
+            x: Particle positions of shape (..., n_particles, spatial_dim).
+
+        Returns:
+            Log-density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape
+                (n_particles, spatial_dim).
+        """
         n, d = self.n_particles, self.spatial_dim
-        if x.shape[-2:] != (n, d):
-            raise ValueError(
-                f"HarmonicCrystal expected x.shape[-2:] == ({n}, {d}), "
-                f"got {tuple(x.shape)}."
-            )
+        check_event_shape(x, (n, d))
         dx = x - self.positions
         if self.box_length is not None:
             dx = dx - self.box_length * jnp.round(dx / self.box_length)

@@ -2,6 +2,7 @@
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from jax_pdf import (
@@ -21,6 +22,7 @@ ALL_DISTS = [
     DW4(),
     NealFunnel(dim=5, sigma=3.0),
     LGCP(grid_dim=5),
+    LGCP(grid_dim=5, whitened=True),
     LennardJones(n_particles=13),
     LennardJones(n_particles=55),
     MullerBrown(beta=1.0),
@@ -101,6 +103,70 @@ class TestInterface:
         x = _test_point(dist)
         traced = jax.jit(lambda d, y: d(y))(dist, x)
         assert jnp.allclose(traced, dist(x), rtol=1e-6)
+
+    @pytest.mark.parametrize("compiled", [False, True], ids=["eager", "jit"])
+    @pytest.mark.parametrize("invalid", [
+        "scalar", "empty", "singleton", "short", "long", "batched", "layout",
+    ])
+    def test_rejects_wrong_event_shape(self, dist, compiled, invalid):
+        """Reject malformed events before broadcasting or indexing can hide them.
+
+        The layout case preserves the number of values but moves event axes;
+        checking total size would incorrectly accept it. Both LGCP forms are
+        included because their linear algebra handles broadcasting differently.
+        """
+        event_shape = _test_point(dist).shape
+        shapes = {
+            "scalar": (),
+            "empty": event_shape[:-1] + (0,),
+            "singleton": event_shape[:-1] + (1,),
+            "short": event_shape[:-1] + (event_shape[-1] - 1,),
+            "long": event_shape[:-1] + (event_shape[-1] + 1,),
+            "batched": (2, 3) + event_shape[:-1] + (event_shape[-1] + 1,),
+            "layout": ((dist.dim,) if len(event_shape) == 2 else (dist.dim, 1)),
+        }
+        x = jnp.zeros(shapes[invalid])
+        call = jax.jit(lambda d, y: d(y)) if compiled else lambda d, y: d(y)
+
+        with pytest.raises(ValueError) as error:
+            call(dist, x)
+
+        message = str(error.value)
+        assert "expected" in message.lower()
+        assert str(event_shape) in message
+        assert f"got shape {x.shape}" in message
+
+    @pytest.mark.parametrize("batch_shape", [(2, 3), (0,), (2, 0)])
+    def test_batch_axes_are_preserved_under_jit(self, dist, batch_shape):
+        """Only event axes are constrained, including for empty batches."""
+        x = _test_point(dist)
+        batch = jnp.broadcast_to(x, batch_shape + x.shape)
+
+        actual = jax.jit(lambda d, y: d(y))(dist, batch)
+
+        assert actual.shape == batch_shape
+        np.testing.assert_allclose(actual, jnp.broadcast_to(dist(x), batch_shape),
+                                   rtol=1e-5)
+
+    def test_jitted_vmap_matches_direct_batching(self, dist):
+        """Mapping over points must not mistake the batch axis for an event."""
+        x = _test_point(dist)
+        batch = jnp.stack([x, x * 1.1, x * 0.9])
+
+        actual = jax.jit(jax.vmap(lambda y: dist(y)))(batch)
+
+        np.testing.assert_allclose(actual, dist(batch), rtol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "dist", [d for d in ALL_DISTS if hasattr(d, "n_particles")],
+    ids=lambda d: type(d).__name__,
+)
+def test_particle_count_is_checked_separately(dist):
+    """A valid spatial dimension does not excuse a wrong particle count."""
+    x = jnp.zeros((dist.n_particles + 1, dist.spatial_dim))
+    with pytest.raises(ValueError, match="[Ee]xpected"):
+        jax.jit(lambda d, y: d(y))(dist, x)
 
 
 @pytest.mark.parametrize(

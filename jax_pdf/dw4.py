@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 
 @struct.dataclass
@@ -107,11 +107,11 @@ class DW4:
 
         Returns:
             Log-density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape (4, 2).
         """
-        if x.shape[-2:] != (4, 2):
-            raise ValueError(
-                f"DW4 expected x.shape[-2:] == (4, 2), got shape {tuple(x.shape)}."
-            )
+        check_event_shape(x, (self.n_particles, self.spatial_dim))
         pos = x
 
         # Pairwise distances, unique pairs i < j

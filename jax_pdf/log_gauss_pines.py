@@ -10,6 +10,7 @@ from flax import struct
 from jax import Array
 
 from jax_pdf import cox_process_utils as cp_utils
+from jax_pdf._validation import check_event_shape
 
 
 # Load pines data at module level (shared across instances)
@@ -135,7 +136,11 @@ class LGCP:
 
         Returns:
             Log probability density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape (dim,).
         """
+        check_event_shape(x, (self.dim,))
         if self.whitened:
             latents = cp_utils.whiten_to_latent(x, self._mean, self._cholesky_cov)
             prior = -0.5 * jnp.sum(x ** 2, axis=-1) + self._log_norm

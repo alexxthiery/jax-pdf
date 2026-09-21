@@ -3,9 +3,9 @@
 mW (Molinero & Moore 2009, arXiv:0809.2811) is a single-site water model: a
 soft two-body term plus a **three-body angular term** that penalises deviation
 from the tetrahedral angle 109.47 deg. Minimum-image PBC. The functional form
-matches bgmat's `MonatomicWaterEnergy` (locked bit-for-bit by a differential
-test); the three-body sum here is vectorised (bgmat's `rollaxis` is removed in
-modern JAX) but identical because the triplet sum is order-independent.
+follows the Stillinger-Weber pair and angular potentials. Tests compare the
+vectorized energy and its derivatives with independent scalar pair/triplet
+sums and analytic configurations; no external reference package is required.
 """
 import math
 from typing import Optional
@@ -15,7 +15,7 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 # Molinero-Moore mW parameters (kcal/mol, Angstrom).
 MW_A = 7.049556277
@@ -122,13 +122,20 @@ class MonatomicWater:
         return jnp.sum(jnp.triu(ang, k=1), axis=(-3, -2, -1))
 
     def __call__(self, x: Array) -> Array:
-        """Unnormalized log-density, `x` shape `(..., n_particles, 3)`."""
+        """Evaluate unnormalized log-density.
+
+        Args:
+            x: Particle positions of shape (..., n_particles, spatial_dim).
+
+        Returns:
+            Log-density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape
+                (n_particles, spatial_dim).
+        """
         n, d = self.n_particles, self.spatial_dim
-        if x.shape[-2:] != (n, d):
-            raise ValueError(
-                f"MonatomicWater expected x.shape[-2:] == ({n}, {d}), "
-                f"got {tuple(x.shape)}."
-            )
+        check_event_shape(x, (n, d))
         diff = self._min_image_diff(x)
         u = self._two_body(diff) + self._three_body(diff / MW_SIGMA)
         return -self.beta * u

@@ -12,7 +12,7 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 
 @struct.dataclass
@@ -133,13 +133,13 @@ class PeriodicLennardJones:
 
         Returns:
             Log-density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape
+                (n_particles, spatial_dim).
         """
         n, d = self.n_particles, self.spatial_dim
-        if x.shape[-2:] != (n, d):
-            raise ValueError(
-                f"PeriodicLennardJones expected x.shape[-2:] == ({n}, {d}), "
-                f"got shape {tuple(x.shape)}."
-            )
+        check_event_shape(x, (n, d))
 
         diff = x[..., :, None, :] - x[..., None, :, :]          # (..., n, n, d)
         diff = diff - self.box_length * jnp.round(diff / self.box_length)

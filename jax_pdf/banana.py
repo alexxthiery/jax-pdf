@@ -5,7 +5,7 @@ import jax.random as jr
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 
 @struct.dataclass
@@ -50,7 +50,11 @@ class Banana2D:
 
         Returns:
             Log probability density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape (2,).
         """
+        check_event_shape(x, (self.dim,))
         x0, x1 = x[..., 0], x[..., 1]
         quad = (x0 - 1.0) ** 2 + (x1 - x0**2) ** 2 / self.sigma**2
         return -0.5 * quad + self.log_normalization()

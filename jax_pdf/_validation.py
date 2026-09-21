@@ -1,6 +1,32 @@
-"""Parameter validation that survives JAX tracing (internal)."""
+"""Internal validation of shape metadata and concrete parameter values."""
 
 import jax
+
+
+def check_event_shape(x: jax.Array, event_shape: tuple[int, ...]) -> None:
+    """Require the trailing axes of ``x`` to match one distribution event.
+
+    Leading batch axes are unrestricted, including axes of length zero.
+    Comparing shape metadata uses no array operations: with ordinary JIT,
+    validation runs during tracing and adds no work to the compiled function.
+    Unlike numeric parameter validation, this check must not be skipped when
+    ``x`` is a tracer. Event sizes must be static; symbolic batch sizes are
+    allowed, but a symbolic event size must be provably equal to the expected
+    size for export to succeed.
+
+    Args:
+        x: Input array of shape ``batch_shape + event_shape``.
+        event_shape: Nonempty tuple of expected trailing dimensions, e.g.
+            ``(dim,)`` or ``(n_particles, spatial_dim)``.
+
+    Raises:
+        ValueError: If ``x`` has too few axes or its trailing axes do not match.
+    """
+    if x.shape[-len(event_shape):] != event_shape:
+        raise ValueError(
+            f"Expected x.shape[-{len(event_shape)}:] == {event_shape}, "
+            f"got shape {tuple(x.shape)}."
+        )
 
 
 def is_concrete(value) -> bool:

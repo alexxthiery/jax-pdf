@@ -217,7 +217,7 @@ class TestInterface:
         """A field of the wrong length is a bug in the caller, not a reshape."""
         dist = LatticePhiFour(lattice_shape=(3, 4))
 
-        with pytest.raises(ValueError, match="last axis"):
+        with pytest.raises(ValueError, match=r"x.shape\[-1:\] == \(12,\)"):
             dist(jnp.zeros(11))
 
     def test_log_normalization_raises(self):

@@ -8,6 +8,16 @@ from jax_pdf import PhiFour
 
 
 class TestPhiFour:
+    @pytest.mark.parametrize("periodic,energy", [(False, 1.0), (True, 0.0)])
+    def test_uniform_unit_field_counts_both_dirichlet_end_bonds(self, periodic, energy):
+        """For a*n=1 and x=1, the local potential vanishes.
+
+        A ring has no differences. Pinned ends each contribute 1/2, so
+        omitting either boundary bond halves the open-chain energy.
+        """
+        dist = PhiFour(a=0.25, dim_grid=4, periodic=periodic, beta=1.7)
+        assert float(dist(jnp.ones(4))) == pytest.approx(-1.7 * energy, abs=1e-6)
+
 
     def test_default_dim(self):
         assert PhiFour().dim == 100

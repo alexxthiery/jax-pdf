@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 
 @struct.dataclass
@@ -74,7 +74,11 @@ class PhiFour:
 
         Returns:
             Unnormalized log-density of shape (...).
+
+        Raises:
+            ValueError: If the input does not have trailing shape (dim_grid,).
         """
+        check_event_shape(x, (self.dim,))
         coef = self.a * self.dim_grid
 
         # Pad for finite differences depending on boundary conditions

@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from flax import struct
 from jax import Array
 
-from jax_pdf._validation import is_concrete
+from jax_pdf._validation import check_event_shape, is_concrete
 
 
 @struct.dataclass
@@ -97,14 +97,10 @@ class LatticePhiFour:
             Unnormalized log-density of shape (...).
 
         Raises:
-            ValueError: if the last axis of x is not `dim`.
+            ValueError: If the input does not have trailing shape (dim,).
         """
+        check_event_shape(x, (self.dim,))
         shape = jnp.shape(x)
-        if not shape or shape[-1] != self.dim:
-            raise ValueError(
-                f"x must have last axis of size dim = {self.dim} for "
-                f"lattice_shape {self.lattice_shape}, got shape {shape}"
-            )
         field = x.reshape(shape[:-1] + tuple(self.lattice_shape))
         axes = tuple(range(-len(self.lattice_shape), 0))
 
