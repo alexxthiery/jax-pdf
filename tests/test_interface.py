@@ -104,6 +104,23 @@ class TestInterface:
         traced = jax.jit(lambda d, y: d(y))(dist, x)
         assert jnp.allclose(traced, dist(x), rtol=1e-6)
 
+    @pytest.mark.parametrize("compiled", [False, True], ids=["vmap", "jit-vmap"])
+    def test_distribution_as_unmapped_vmap_argument(self, dist, compiled):
+        """Pytree structure probing must not validate JAX's object placeholders.
+
+        This differs from a closure over dist: vmap reconstructs the argument
+        with sentinel leaves before rebuilding it with actual arrays/tracers.
+        Compare distinct points against ordinary evaluation of the same model.
+        """
+        x = _test_point(dist)
+        points = jnp.stack([x, x * 1.1])
+        evaluate = jax.vmap(lambda d, y: d(y), in_axes=(None, 0))
+        if compiled:
+            evaluate = jax.jit(evaluate)
+        actual = evaluate(dist, points)
+        expected = jnp.stack([dist(point) for point in points])
+        np.testing.assert_allclose(actual, expected, rtol=3e-6, atol=2e-5)
+
     @pytest.mark.parametrize("compiled", [False, True], ids=["eager", "jit"])
     @pytest.mark.parametrize("invalid", [
         "scalar", "empty", "singleton", "short", "long", "batched", "layout",

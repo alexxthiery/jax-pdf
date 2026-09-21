@@ -36,7 +36,10 @@ def is_concrete(value) -> bool:
     ``jit`` or ``vmap`` boundary is rebuilt by ``tree_unflatten`` with tracers
     in their place, and ``__post_init__`` runs again on them. Comparing a
     tracer cannot produce a Python bool, so a validation guarded by this
-    function checks concrete values and is skipped under tracing.
+    function checks concrete values and is skipped under tracing. JAX also
+    probes pytree structure using plain ``object()`` leaves before mapping;
+    these placeholders have no numeric value to validate. Test the exact type,
+    since every Python value is an instance of object.
 
     Structural parameters (sizes, flags, modes) are static instead, so they
     are always concrete and need no guard, and they may drive Python control
@@ -46,6 +49,7 @@ def is_concrete(value) -> bool:
         value: A parameter value.
 
     Returns:
-        True for an ordinary Python or NumPy value, False for a JAX tracer.
+        True for ordinary parameter values, False for JAX tracers and plain
+        object placeholders used during pytree reconstruction.
     """
-    return not isinstance(value, jax.core.Tracer)
+    return type(value) is not object and not isinstance(value, jax.core.Tracer)

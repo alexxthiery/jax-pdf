@@ -37,8 +37,8 @@ class MyDist:
     """Structural: static, so it can set shapes and drive control flow."""
 
     def __post_init__(self):
-        # A numeric parameter is a tracer when the distribution crosses a jit
-        # or vmap boundary, and a tracer cannot be compared.
+        # JAX reconstructs pytrees with tracers or temporary object placeholders;
+        # neither can be compared to validate a numeric parameter.
         if is_concrete(self.param) and self.param <= 0:
             raise ValueError(
                 f"param must be positive, got {self.param}"
@@ -99,7 +99,7 @@ Requirements:
 - `__call__` returns log probability, supports batch via `x[..., i]`
 - `dim` is a property, not a method
 - Numeric parameters stay pytree children, so they can be swept with `vmap` and differentiated; sizes, flags and modes are `struct.field(pytree_node=False)`, so they stay concrete and may drive Python control flow
-- Guard validation of a numeric parameter with `is_concrete`, so the distribution can be passed to a jitted function. Validation of a static field needs no guard
+- Guard validation of a numeric parameter with `is_concrete`, so the distribution can be passed through JIT and as an unmapped `vmap` argument. This skips tracers and JAX's plain object placeholders; validation of a static field needs no guard
 - Start `__call__` with `check_event_shape(x, (self.dim,))` for a generic distribution, or `check_event_shape(x, (self.n_particles, self.spatial_dim))` for a particle distribution. Check trailing axes, not total size or batch axes
 - Keep shape checks active when `x` is a tracer: they compare metadata and need no `is_concrete` guard, array operations, or callbacks. Do not coerce, flatten, or reshape malformed events to make the check pass
 - `log_normalization()` returns a scalar, either a Python float or a JAX scalar; returns 0.0 for normalized distributions; raises `NotImplementedError` if intractable
@@ -127,6 +127,7 @@ ALL_DISTS = [
 ```
 
 This automatically runs the shared interface tests: dimensions, values, batches (including multiple and empty batch axes), gradients, vectorization, and passing the distribution as a JIT argument.
+It also passes the distribution as an unmapped `vmap` argument, with and without an enclosing JIT, to exercise pytree reconstruction.
 It also verifies that incorrect event shapes raise a diagnostic `ValueError` in both eager and JIT execution.
 Include parameterizations with different input-handling paths, such as both whitened and unwhitened LGCP.
 
@@ -205,7 +206,7 @@ seeded fixtures and real-RNG shape/support checks are fine when their assertions
 do not depend on sampling error. Do not freeze a particular PRNG output stream.
 
 The [test effectiveness audit](docs/test_audit.md) records demonstrated gaps,
-the tests that close them, and unresolved API issues. Run the focused mutation
+the tests that close them, and the subsequent API fixes. Run the focused mutation
 audit after changing these numerical contracts:
 
 ```bash

@@ -91,7 +91,7 @@ Why two tiers: particle distributions have a semantically meaningful particle ax
 - Pure functions, explicit state, no side effects
 - Compatible with `jit`, `vmap`, `grad` without surprises, including passing a distribution itself as an argument to a jitted function
 - Numeric parameters are pytree children, so they can be swept with `vmap` and differentiated. Sizes, flags and modes are static (`struct.field(pytree_node=False)`), so they stay concrete and may drive Python control flow
-- Validation of a numeric parameter is guarded by `is_concrete` from `jax_pdf._validation`: it runs on concrete values and is skipped when the parameter is a tracer
+- Validation of a numeric parameter is guarded by `is_concrete` from `jax_pdf._validation`: it runs on concrete values and is skipped for tracers and JAX's plain object placeholders during pytree reconstruction. Shape checks still run on tracers; skip only the object placeholder when validating array fields in `__post_init__`
 - Every `__call__` uses `check_event_shape` from `jax_pdf._validation` for its documented trailing axes. Shape metadata remains available under tracing, so this check is never guarded by `is_concrete`; leading batch axes stay unrestricted
 - Prefer deterministic sampler tests (controlled innovations, probability weights, quadrature, exact enumeration). Avoid Monte Carlo statistical assertions in the default unit suite; seeded inputs for algebraic or shape/support checks are fine
 - Tests must run without sibling repositories or optional external reference implementations. Use analytic or independent scalar numerical oracles; do not modify `sys.path` to import another checkout or skip comparisons when it is absent

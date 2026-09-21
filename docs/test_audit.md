@@ -3,15 +3,18 @@
 Audit date: 2026-09-21.
 
 The existing suite missed substantive numerical mistakes: **11 of 16 selected
-mutations survived**. After strengthening the tests, **all 16 are detected** and
-the unmodified suite passes **724 tests with no skips**. This is evidence for
-these particular contracts, not an exhaustive mutation score or proof that the
-package is correct. Three existing API issues remain unresolved below.
+mutations survived**. The strengthened audit suite detected **all 16** and
+passed **724 tests with no skips**. This is evidence for those particular
+contracts, not an exhaustive mutation score or proof that the package is
+correct. The three API issues discovered by the audit have since been fixed;
+the suite now passes **775 tests with no skips**, with warnings treated as
+errors. Their regressions are described below.
 
 The comparison starts from the working tree after event-shape validation and
 the removal of external bgmat test imports, with 697 passing tests. It is not a
-comparison against an upstream release. This audit changes tests and adds a
-mutation runner; it does not change distribution implementations.
+comparison against an upstream release. The initial audit changed tests and
+added a mutation runner. Subsequent commits fix the three API issues described
+below.
 
 ## What the tests now establish
 
@@ -66,13 +69,11 @@ cases, reducing the suite from 727 to 724 cases. The affected three sampler
 mutations were rechecked after replacement. Numerical tolerances now cover
 floating-point and quadrature error, not Monte Carlo uncertainty.
 
-## Confirmed unresolved issues
+## Confirmed API issues and follow-up fixes
 
-These are existing implementation issues discovered during the audit. They
-are not intentionally accepted behavior, and no skipped or expected-failure
-tests were added to make them disappear. The passing suite above does not
-certify these contracts. The snippets below reproduce the issues separately;
-run the precision example in a fresh process.
+The initial audit deliberately reported these implementation issues separately
+from its passing tests. Each is now fixed in a separate commit, with regressions
+that failed before the corresponding fix. All tests remain deterministic.
 
 ### Banana normalizing-constant semantics (fixed)
 
@@ -99,26 +100,22 @@ guesses, validation errors, result dtypes, and subsequent JAX allocations.
 The one-cell stationary-equation reference also checks converged Laplace
 results with both caller settings. Nine regressions failed before this fix.
 
-### Passing a distribution as an unmapped `vmap` argument fails
+### Passing a distribution as an unmapped `vmap` argument (fixed)
 
-Closure-based `vmap` and passing a distribution directly through `jit` are
-covered. The combination below is a distinct path and currently fails during
-Flax reconstruction: parameter validation compares an internal `object`
-placeholder with an integer.
+JAX reconstructs pytrees with plain object placeholders while determining the
+argument structure. Numeric validation previously compared those objects with
+numbers, and HarmonicCrystal tried to validate a placeholder's rank. This
+caused `vmap(lambda dist, x: dist(x), in_axes=(None, 0))` to fail for several
+distributions, with or without an enclosing JIT.
 
-```python
-import jax
-import jax.numpy as jnp
-from jax_pdf import Banana2D
+The numeric guard now excludes that exact placeholder type, and HarmonicCrystal
+skips the placeholder's shape check. Concrete numeric validation and tracer
+shape validation remain active. The shared interface tests cover all
+17 distribution configurations in both transformation modes; 24 of the 34
+cases failed before the fix. A separate negative control checks that malformed
+HarmonicCrystal positions still fail when passed through JIT.
 
-evaluate = jax.jit(jax.vmap(lambda dist, x: dist(x), in_axes=(None, 0)))
-evaluate(Banana2D(), jnp.ones((2, 2)))
-# TypeError: '<=' not supported between instances of 'object' and 'int'
-```
-
-Follow-up: make numeric parameter validation compatible with pytree
-reconstruction, while retaining validation of ordinary user inputs. Add this
-specific transformation composition as a regression across distributions.
+This handling follows [JAX's pytree initialization guidance](https://docs.jax.dev/en/latest/custom_pytrees.html#custom-pytrees-and-initialization-with-unexpected-values).
 
 ## Reproducing the checks
 
@@ -149,5 +146,5 @@ Validation used Python 3.13, JAX 0.7.2, Flax 0.12.0, and NumPy 2.3.3 on CPU.
 The focused LGCP tests also passed with warnings treated as errors. Older
 supported runtimes and accelerators were not exercised. Invalid parameter
 types, nonfinite inputs, and every possible composition of JAX transformations
-were not exhaustively tested. The three confirmed issues above are concrete
-follow-up work before making broader compatibility claims.
+were not exhaustively tested. These targeted fixes do not establish compatibility
+with every possible nesting of JAX transformations.

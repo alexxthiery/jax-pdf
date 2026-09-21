@@ -15,7 +15,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jax_pdf import LennardJones, PhiFour
+from jax_pdf import HarmonicCrystal, LennardJones, PhiFour
 
 DIM = 8
 X = jnp.linspace(-1.0, 1.0, DIM)
@@ -100,6 +100,13 @@ class TestNumericParametersAreTraced:
 
 
 class TestValidation:
+
+    def test_positions_shape_is_validated_inside_jit(self):
+        """Skipping sentinel validation must not skip available tracer shapes."""
+        with pytest.raises(ValueError, match="positions must be"):
+            jax.jit(lambda positions: HarmonicCrystal(positions=positions).dim)(
+                jnp.zeros(3)
+            )
 
     @pytest.mark.parametrize("bad", [-1.0, np.float32(-1.0), jnp.float32(-1.0)])
     def test_validation_fires_on_every_concrete_value(self, bad):

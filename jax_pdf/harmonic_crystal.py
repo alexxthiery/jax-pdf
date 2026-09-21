@@ -33,7 +33,9 @@ class HarmonicCrystal:
     box_length: float = None
 
     def __post_init__(self):
-        if jnp.ndim(self.positions) != 2:
+        # vmap probes the pytree with object placeholders. Actual arrays and
+        # tracers still expose shapes, so keep their rank validation active.
+        if type(self.positions) is not object and jnp.ndim(self.positions) != 2:
             raise ValueError(
                 f"HarmonicCrystal: positions must be (n_particles, spatial_dim), "
                 f"got shape {jnp.shape(self.positions)}."
