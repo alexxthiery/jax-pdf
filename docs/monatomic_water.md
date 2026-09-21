@@ -40,6 +40,37 @@ $$
 
 where $\theta_{jik}$ is the angle at the central particle and $\theta_0 = 109.47^\circ$ is the ideal tetrahedral angle. The term is zero when a triplet sits at the tetrahedral angle and grows quadratically away from it; this is what drives mW into an ice-like (diamond / hexagonal) crystal at low temperature.
 
+### Cost, and the neighbour list
+
+The dense three-body sum builds an $(N, N, N)$ tensor. That is fine to a few
+hundred particles and impossible beyond: at $N = 512$ with eight configurations
+it asks XLA for a 4.3 GB intermediate, and its gradient for 12 GB, so the
+compiler either fails to find a configuration or the allocation is refused.
+
+`n_neighbours` replaces the inner double sum by each particle's $k$ nearest
+neighbours, at cost $O(N k^2)$. It is **exact, not an approximation**, whenever
+every particle within the cutoff is in the list: a triplet with a neighbour
+beyond $r_c \sigma = 4.31$ Angstrom has radial factor $f = 0$ in the dense sum,
+so dropping it changes nothing, and the same factor is applied to listed
+neighbours. `max_neighbours_within_cutoff(x)` returns the largest number of
+particles within the cutoff of any centre, which is the number $k$ must cover;
+measure it on a sample of the configurations of interest and keep a margin.
+
+For mW cubic ice at its coexistence density, the four nearest neighbours sit at
+2.68 Angstrom and the second shell at 4.38, just outside the cutoff, so thermal
+displacements of about 0.14 Angstrom bring part of that shell inside: the
+measured count is 11 to 13 particles at $N = 64$ to $512$, and $k = 20$ has
+room. The two-body sum stays dense, which is $O(N^2)$ and cheap.
+
+Measured on one RTX 4500 Ada, gradient of the energy summed over 8
+configurations:
+
+| $N$ | dense | `n_neighbours=20` |
+|---|---|---|
+| 64 | 0.1 ms | 0.1 ms |
+| 216 | 11.2 ms | 0.2 ms |
+| 512 | out of memory (12 GB) | 0.5 ms |
+
 ## Symmetries
 
 - **Permutation invariance**: relabelling particles does not change the energy.
@@ -58,6 +89,7 @@ The three-body term couples triplets, so the energy is not a sum of pair interac
 | `beta` | `1.0` | Inverse temperature, $1/kT$ in $1/(\text{kcal/mol})$ |
 | `min_distance` | `0.0` | Two-body squared distance clipped to `min_distance**2` (set $> 0$ for training) |
 | `linearize_below` | `None` | If set (Angstrom, $> 0$), two-body potential is linear in $r$ below it (training softening) |
+| `n_neighbours` | `None` | If set ($2 \le k \le N-1$), three-body sum over the $k$ nearest neighbours instead of all pairs; exact while $k \ge$ `max_neighbours_within_cutoff(x)` |
 | `spatial_dim` | `3` | Spatial dimension per particle |
 
 Fixed mW constants (Molinero and Moore): $A = 7.0496$, $B = 0.6022$, $\gamma = 1.2$, $\varepsilon = 6.189$ kcal/mol, $\sigma = 2.3925$ Angstrom, $\lambda = 23.15$, $r_c = 1.8$.
@@ -85,6 +117,10 @@ mw_train = MonatomicWater(n_particles=64, box_length=14.0, beta=0.5, min_distanc
 # bgmat's training energy: clip at 0.01 A, linear in r below 1.2 A
 mw_bgmat_train = MonatomicWater(n_particles=64, box_length=14.0, beta=0.5,
                                 min_distance=0.01, linearize_below=1.2)
+# Large systems: three-body sum over the 20 nearest neighbours (see "Cost").
+# Check the list is large enough on the configurations you will evaluate:
+mw_big = MonatomicWater(n_particles=512, box_length=24.8, beta=2.5161, n_neighbours=20)
+assert int(mw_big.max_neighbours_within_cutoff(xs_big).max()) <= 20
 ```
 
 ## References

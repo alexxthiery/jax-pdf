@@ -306,3 +306,146 @@ def test_isolated_right_angle_has_known_three_body_energy():
     assert _reference_energy(x, 20.0) == pytest.approx(expected, rel=1e-12)
     dist = MonatomicWater(n_particles=3, box_length=20.0)
     assert float(-dist(jnp.asarray(x))) == pytest.approx(expected, rel=1e-5)
+
+
+@pytest.fixture
+def x64():
+    """float64 for this test only, restored afterwards.
+
+    The neighbour list and the dense sum add the same terms in a different
+    order, so in float32 they agree to about 1e-5 relative and a differential
+    test cannot distinguish that from a real defect (a dropped triplet at the
+    cutoff is the same size). In float64 the difference is 1e-12 relative.
+    """
+    old = jax.config.jax_enable_x64
+    jax.config.update("jax_enable_x64", True)
+    yield
+    jax.config.update("jax_enable_x64", old)
+
+
+_DIAMOND = np.array(                                      # diamond cubic, 8 sites
+    [[0, 0, 0], [0, 2, 2], [2, 0, 2], [2, 2, 0],
+     [1, 1, 1], [1, 3, 3], [3, 1, 3], [3, 3, 1]], dtype=np.float64) / 4.0
+
+
+def _ice_config(cells=1, a=6.2, jitter=0.0, key=3, batch=None):
+    """mW cubic ice: ``cells**3`` diamond cells at the ice lattice constant.
+
+    mW ice is the interesting case for the neighbour list because its shells sit
+    right at the cutoff: nearest neighbours at ``a*sqrt(3)/4 = 2.68`` A (four of
+    them) and the second shell at ``a/sqrt(2) = 4.38`` A, just outside
+    ``1.8*sigma = 4.31``. A jitter of a few tenths of an Angstrom, the size of
+    the thermal displacements, pushes part of that shell inside, so the count
+    within the cutoff varies between configurations.
+    """
+    offsets = np.stack(np.meshgrid(*(np.arange(cells),) * 3, indexing="ij"), -1).reshape(-1, 3)
+    sites = (offsets[:, None, :] + _DIAMOND[None, :, :]).reshape(-1, 3) * a
+    x = jnp.asarray(sites)
+    if batch is not None:
+        x = jnp.broadcast_to(x, (batch, *x.shape))
+    if jitter:
+        x = x + jitter * jax.random.normal(jax.random.PRNGKey(key), x.shape)
+    return x, float(cells * a)
+
+
+class TestNeighbourList:
+    """The three-body sum over a k-nearest-neighbour list (bgmat-clean step E1).
+
+    Why it exists: the dense sum builds an ``(N, N, N)`` tensor, which is 4.3 GB
+    at N=512 with eight configurations, so XLA refuses it outright. The list
+    makes the cost ``N k**2``.
+
+    The oracle is the dense implementation itself, which ``TestBgmatDifferential``
+    locks to bgmat. The list is **exact**, not an approximation, whenever every
+    particle within the three-body cutoff is in the list: triplets outside the
+    cutoff contribute exactly zero to the dense sum. That condition is a
+    property of the configuration, so ``max_neighbours_within_cutoff`` reports
+    it and the tests below check both sides of it.
+    """
+
+    @pytest.mark.parametrize("cells,jitter,n_neighbours", [
+        (1, 0.0, 6), (1, 0.15, 7),                   # N=8, k up to N-1
+        (2, 0.0, 6), (2, 0.0, 16),                   # N=64, list below and above shell 2
+        (2, 0.15, 16), (2, 0.25, 20),                # thermal and beyond-thermal jitter
+    ])
+    def test_matches_dense_on_ice(self, x64, cells, jitter, n_neighbours):
+        """Equality on the configurations the flow actually produces: the ice
+        lattice, clean and thermally jittered, at N=8 and N=64. k=6 is above the
+        four nearest neighbours but below the second shell; jitter pulls part of
+        that shell inside the cutoff, and then k must cover it (measured here:
+        0.25 A of jitter puts 11 to 13 particles inside)."""
+        x, box = _ice_config(cells=cells, jitter=jitter, batch=3)
+        kw = dict(n_particles=x.shape[-2], box_length=box, beta=2.5161)
+        dense, listed = MonatomicWater(**kw), MonatomicWater(**kw, n_neighbours=n_neighbours)
+        assert int(jnp.max(dense.max_neighbours_within_cutoff(x))) <= n_neighbours
+        assert jnp.allclose(listed(x), dense(x), rtol=1e-11, atol=1e-9)
+
+    def test_matches_dense_with_training_softening(self, x64):
+        """The two-body term (and its ``min_distance`` clip and linearisation) is
+        untouched by the list, including for overlapping particles: only the
+        three-body sum changes."""
+        x, box = _ice_config(cells=2, jitter=0.4, batch=2)
+        x = x.at[..., 1, :].set(x[..., 0, :] + 0.01)           # an overlapping pair
+        kw = dict(n_particles=x.shape[-2], box_length=box, beta=2.5161,
+                  min_distance=0.01, linearize_below=1.2)
+        dense, listed = MonatomicWater(**kw), MonatomicWater(**kw, n_neighbours=16)
+        assert jnp.allclose(listed(x), dense(x), rtol=1e-11, atol=1e-9)
+
+    def test_gradient_matches_dense(self, x64):
+        """Reverse KL differentiates the target, so the gradient is what training
+        sees. A hard neighbour selection gives the exact gradient as long as the
+        excluded neighbours are beyond the cutoff, where the energy is flat."""
+        x, box = _ice_config(cells=2, jitter=0.25)
+        kw = dict(n_particles=x.shape[-2], box_length=box, beta=2.5161)
+        dense, listed = MonatomicWater(**kw), MonatomicWater(**kw, n_neighbours=16)
+        assert jnp.allclose(jax.grad(listed)(x), jax.grad(dense)(x), rtol=1e-9, atol=1e-9)
+
+    def test_too_few_neighbours_changes_the_answer(self, x64):
+        """The positive control that makes the tests above able to fail: with
+        k below the number of particles inside the cutoff, triplets are dropped
+        and the energy differs. This is also what the guard is for."""
+        x, box = _ice_config(cells=2, jitter=0.25)
+        kw = dict(n_particles=x.shape[-2], box_length=box, beta=2.5161)
+        dense, listed = MonatomicWater(**kw), MonatomicWater(**kw, n_neighbours=2)
+        assert int(jnp.max(dense.max_neighbours_within_cutoff(x))) > 2
+        assert not jnp.allclose(listed(x), dense(x), rtol=1e-3)
+
+    def test_max_neighbours_within_cutoff_counted_by_hand(self):
+        """Hand-built oracle: a centre with three particles at 3 A (inside the
+        4.31 A cutoff) and one at 5 A (outside) has three neighbours, and the
+        count is the maximum over centres, so it is 3 and not 1."""
+        x = jnp.array([[0.0, 0.0, 0.0], [3.0, 0.0, 0.0], [0.0, 3.0, 0.0],
+                       [0.0, 0.0, 3.0], [5.0, 5.0, 5.0]])
+        mw = MonatomicWater(n_particles=5, box_length=40.0)
+        assert int(mw.max_neighbours_within_cutoff(x)) == 3
+
+    def test_max_neighbours_within_cutoff_uses_the_minimum_image(self):
+        """Two particles across the seam are neighbours through the boundary."""
+        x = jnp.array([[0.1, 0.0, 0.0], [9.9, 0.0, 0.0]])       # 0.2 A apart in a box of 10
+        mw = MonatomicWater(n_particles=2, box_length=10.0)
+        assert int(mw.max_neighbours_within_cutoff(x)) == 1
+
+    def test_no_cubic_intermediate_is_traced(self):
+        """The reason E1 exists, stated mechanically: no array of order N**3 is
+        ever created. Checked on the jaxpr, which records exactly the shapes the
+        implementation asks for, before XLA fuses anything."""
+        n, k = 64, 8
+        x, box = _ice_config(cells=2)
+        mw = MonatomicWater(n_particles=n, box_length=box, n_neighbours=k)
+        jaxpr = jax.make_jaxpr(mw.__call__)(x)
+        sizes = [int(np.prod(v.aval.shape)) for eqn in jaxpr.eqns for v in eqn.outvars
+                 if hasattr(v.aval, "shape")]
+        bound = 4 * max(n * n, n * k * k)                      # 2-body is dense, 3-body is not
+        assert max(sizes) <= bound, f"largest traced array {max(sizes)} > {bound}"
+        assert max(sizes) < n**3                               # the dense sum's tensor
+
+    @pytest.mark.parametrize("bad", [0, 1, 8, 9, -3])
+    def test_invalid_n_neighbours_raises(self, bad):
+        """A pair of neighbours is the smallest triplet, and a particle has at
+        most N-1 neighbours; both bounds are caught at construction."""
+        with pytest.raises(ValueError):
+            MonatomicWater(n_particles=8, box_length=6.2, n_neighbours=bad)
+
+    def test_dense_is_the_default(self):
+        """Opt-in: the field defaults to None, so existing callers are unchanged."""
+        assert MonatomicWater(n_particles=8, box_length=6.2).n_neighbours is None

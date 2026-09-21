@@ -14,7 +14,7 @@ from jax_pdf.periodic_lennard_jones import PeriodicLennardJones
 from jax_pdf.phi_four import PhiFour
 from jax_pdf.phi_four_oracle import PhiFourChainOracle
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "Banana2D",
     "DoubleWell",

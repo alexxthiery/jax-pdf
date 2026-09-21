@@ -42,7 +42,8 @@ jax_pdf/
   dw4.py                # DW4 distribution (4-particle double-well)
   lennard_jones.py      # LennardJones distribution (LJ13, LJ55; free cluster)
   periodic_lennard_jones.py  # PeriodicLennardJones (periodic LJ solid, minimum image)
-  monatomic_water.py    # MonatomicWater (mW water, Stillinger-Weber, periodic)
+  monatomic_water.py    # MonatomicWater (mW water, Stillinger-Weber, periodic;
+                        #   n_neighbours: exact O(N k^2) three-body sum for large N)
   harmonic_crystal.py   # HarmonicCrystal (Einstein crystal, exact log Z)
   cox_process_utils.py  # utility functions for LGCP
   _validation.py        # internal: event shape checks and concrete parameter validation
