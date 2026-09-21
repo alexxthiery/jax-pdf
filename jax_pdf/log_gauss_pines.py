@@ -9,6 +9,11 @@ import optax
 from flax import struct
 from jax import Array
 
+try:
+    from jax import enable_x64 as _enable_x64
+except ImportError:  # JAX < 0.8 exposes the scoped setting in experimental.
+    from jax.experimental import enable_x64 as _enable_x64
+
 from jax_pdf import cox_process_utils as cp_utils
 from jax_pdf._validation import check_event_shape
 
@@ -172,6 +177,11 @@ class LGCP:
     ) -> dict:
         """Compute Maximum A Posteriori (MAP) estimate via L-BFGS.
 
+        Runs eagerly with float64 iterates and histories in a scoped precision
+        context. The caller's JAX precision setting is preserved, even on errors.
+        Construct the distribution in float64 as well if its cached covariance
+        needs full float64 accuracy; casting cannot recover earlier rounding.
+
         Args:
             x0: Initial guess of shape (dim,). Defaults to zeros.
             max_iter: Maximum optimization iterations.
@@ -186,84 +196,88 @@ class LGCP:
                 - "n_iters": number of iterations taken
                 - "converged": whether tolerance was reached
         """
-        # L-BFGS needs float64 for convergence
-        jax.config.update("jax_enable_x64", True)
+        # Scope precision around tracing, execution and history extraction.
+        # L-BFGS needs float64, but unrelated caller computations must retain
+        # their own setting, including if validation or optimization raises.
+        with _enable_x64():
+            if x0 is None:
+                x0 = jnp.zeros(self.dim, dtype=jnp.float64)
+            else:
+                x0 = jnp.asarray(x0, dtype=jnp.float64)
 
-        if x0 is None:
-            x0 = jnp.zeros(self.dim, dtype=jnp.float64)
+            if x0.shape != (self.dim,):
+                raise ValueError(f"x0 must have shape ({self.dim},), got {x0.shape}")
 
-        if x0.shape != (self.dim,):
-            raise ValueError(f"x0 must have shape ({self.dim},), got {x0.shape}")
+            def loss_fn(x):
+                return -self(x)
 
-        def loss_fn(x):
-            return -self(x)
+            grad_fn = jax.grad(loss_fn)
+            optimizer = optax.lbfgs()
+            opt_state = optimizer.init(x0)
 
-        grad_fn = jax.grad(loss_fn)
-        optimizer = optax.lbfgs()
-        opt_state = optimizer.init(x0)
+            # Pre-allocate history arrays (max_iter + 1 for initial state)
+            x_history = jnp.zeros((max_iter + 1, self.dim))
+            loss_history = jnp.zeros(max_iter + 1)
+            grad_norm_history = jnp.zeros(max_iter + 1)
 
-        # Pre-allocate history arrays (max_iter + 1 for initial state)
-        x_history = jnp.zeros((max_iter + 1, self.dim))
-        loss_history = jnp.zeros(max_iter + 1)
-        grad_norm_history = jnp.zeros(max_iter + 1)
+            def cond_fun(state):
+                _, _, _, _, grad_norm, i, _, _, _ = state
+                return (grad_norm > tol) & (i < max_iter)
 
-        def cond_fun(state):
-            _, _, _, _, grad_norm, i, _, _, _ = state
-            return (grad_norm > tol) & (i < max_iter)
+            def body_fun(state):
+                x, opt_state, loss, grad, grad_norm, i, x_hist, loss_hist, grad_norm_hist = state
 
-        def body_fun(state):
-            x, opt_state, loss, grad, grad_norm, i, x_hist, loss_hist, grad_norm_hist = state
+                # Store current state in history
+                x_hist = x_hist.at[i].set(x)
+                loss_hist = loss_hist.at[i].set(loss)
+                grad_norm_hist = grad_norm_hist.at[i].set(grad_norm)
 
-            # Store current state in history
-            x_hist = x_hist.at[i].set(x)
-            loss_hist = loss_hist.at[i].set(loss)
-            grad_norm_hist = grad_norm_hist.at[i].set(grad_norm)
+                # Optimization step
+                updates, opt_state = optimizer.update(
+                    grad, opt_state, params=x, value=loss, grad=grad, value_fn=loss_fn
+                )
+                x_new = optax.apply_updates(x, updates)
+                loss_new = loss_fn(x_new)
+                grad_new = grad_fn(x_new)
+                grad_norm_new = jnp.linalg.norm(grad_new)
 
-            # Optimization step
-            updates, opt_state = optimizer.update(
-                grad, opt_state, params=x, value=loss, grad=grad, value_fn=loss_fn
+                return (x_new, opt_state, loss_new, grad_new, grad_norm_new, i + 1,
+                        x_hist, loss_hist, grad_norm_hist)
+
+            @jax.jit
+            def run_lbfgs(x0, opt_state, x_hist, loss_hist, grad_norm_hist):
+                loss0 = loss_fn(x0)
+                grad0 = grad_fn(x0)
+                grad_norm0 = jnp.linalg.norm(grad0)
+
+                init_state = (x0, opt_state, loss0, grad0, grad_norm0, 0,
+                              x_hist, loss_hist, grad_norm_hist)
+                final_state = jax.lax.while_loop(cond_fun, body_fun, init_state)
+
+                x_final, _, loss_final, _, grad_norm_final, n_iters, x_hist, loss_hist, grad_norm_hist = final_state
+
+                # Store final state
+                x_hist = x_hist.at[n_iters].set(x_final)
+                loss_hist = loss_hist.at[n_iters].set(loss_final)
+                grad_norm_hist = grad_norm_hist.at[n_iters].set(grad_norm_final)
+
+                return x_final, n_iters, grad_norm_final, x_hist, loss_hist, grad_norm_hist
+
+            x_map, n_iters, final_grad_norm, x_hist, loss_hist, grad_norm_hist = run_lbfgs(
+                x0, opt_state, x_history, loss_history, grad_norm_history
             )
-            x_new = optax.apply_updates(x, updates)
-            loss_new = loss_fn(x_new)
-            grad_new = grad_fn(x_new)
-            grad_norm_new = jnp.linalg.norm(grad_new)
 
-            return (x_new, opt_state, loss_new, grad_new, grad_norm_new, i + 1,
-                    x_hist, loss_hist, grad_norm_hist)
+            # Slice history to actual length (n_iters + 1 points: initial + n_iters steps)
+            actual_len = n_iters + 1
+            return {
+                "x": x_map,
+                "x_history": x_hist[:actual_len],
+                "loss_history": loss_hist[:actual_len],
+                "grad_norm_history": grad_norm_hist[:actual_len],
+                "n_iters": int(n_iters),
+                "converged": bool(final_grad_norm <= tol),
+            }
 
-        @jax.jit
-        def run_lbfgs(x0, opt_state, x_hist, loss_hist, grad_norm_hist):
-            loss0 = loss_fn(x0)
-            grad0 = grad_fn(x0)
-            grad_norm0 = jnp.linalg.norm(grad0)
-
-            init_state = (x0, opt_state, loss0, grad0, grad_norm0, 0,
-                          x_hist, loss_hist, grad_norm_hist)
-            final_state = jax.lax.while_loop(cond_fun, body_fun, init_state)
-
-            x_final, _, loss_final, _, grad_norm_final, n_iters, x_hist, loss_hist, grad_norm_hist = final_state
-
-            # Store final state
-            x_hist = x_hist.at[n_iters].set(x_final)
-            loss_hist = loss_hist.at[n_iters].set(loss_final)
-            grad_norm_hist = grad_norm_hist.at[n_iters].set(grad_norm_final)
-
-            return x_final, n_iters, grad_norm_final, x_hist, loss_hist, grad_norm_hist
-
-        x_map, n_iters, final_grad_norm, x_hist, loss_hist, grad_norm_hist = run_lbfgs(
-            x0, opt_state, x_history, loss_history, grad_norm_history
-        )
-
-        # Slice history to actual length (n_iters + 1 points: initial + n_iters steps)
-        actual_len = n_iters + 1
-        return {
-            "x": x_map,
-            "x_history": x_hist[:actual_len],
-            "loss_history": loss_hist[:actual_len],
-            "grad_norm_history": grad_norm_hist[:actual_len],
-            "n_iters": int(n_iters),
-            "converged": bool(final_grad_norm <= tol),
-        }
 
     def hessian_at(self, x: Array) -> Array:
         """Compute Hessian of negative log-density at a point.
@@ -290,6 +304,9 @@ class LGCP:
     ) -> dict:
         """Compute Laplace approximation (Gaussian at MAP).
 
+        MAP, Hessian, and inversion use scoped float64 precision. The caller's
+        JAX precision setting is preserved, even on errors.
+
         Args:
             x0: Initial guess for MAP optimization.
             max_iter: Maximum optimization iterations.
@@ -307,22 +324,25 @@ class LGCP:
                     - "n_iters": iterations taken
                     - "converged": whether tolerance reached
         """
-        map_result = self.map_estimate(x0=x0, max_iter=max_iter, tol=tol)
-        x_map = map_result["x"]
-        hessian = self.hessian_at(x_map)
+        # Keep Hessian construction and inversion in the same precision as
+        # MAP; map_estimate restores the setting of this enclosing context.
+        with _enable_x64():
+            map_result = self.map_estimate(x0=x0, max_iter=max_iter, tol=tol)
+            x_map = map_result["x"]
+            hessian = self.hessian_at(x_map)
 
-        if not jnp.all(jnp.linalg.eigvalsh(hessian) > 0):
-            raise ValueError("Hessian not positive definite at MAP")
+            if not jnp.all(jnp.linalg.eigvalsh(hessian) > 0):
+                raise ValueError("Hessian not positive definite at MAP")
 
-        return {
-            "mu": x_map,
-            "precision": hessian,
-            "cov": jnp.linalg.inv(hessian),
-            "optimization": {
-                "x_history": map_result["x_history"],
-                "loss_history": map_result["loss_history"],
-                "grad_norm_history": map_result["grad_norm_history"],
-                "n_iters": map_result["n_iters"],
-                "converged": map_result["converged"],
-            },
-        }
+            return {
+                "mu": x_map,
+                "precision": hessian,
+                "cov": jnp.linalg.inv(hessian),
+                "optimization": {
+                    "x_history": map_result["x_history"],
+                    "loss_history": map_result["loss_history"],
+                    "grad_norm_history": map_result["grad_norm_history"],
+                    "n_iters": map_result["n_iters"],
+                    "converged": map_result["converged"],
+                },
+            }

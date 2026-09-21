@@ -85,24 +85,19 @@ under JIT and the absolute density after generic normalization. All three
 failed before the fix; existing analytic density and gradient tests protect
 against accidentally removing the constants from the density itself.
 
-### LGCP optimization changes global JAX precision
+### LGCP optimization changes global JAX precision (fixed)
 
-`LGCP.map_estimate` unconditionally enables 64-bit JAX globally. A call can
-therefore alter unrelated computations and subsequent tests.
+`LGCP.map_estimate` previously enabled float64 globally, affecting unrelated
+computations even when input validation raised. MAP and Laplace now use scoped
+float64 contexts and preserve the caller's setting. Supplied float32 initial
+iterates are explicitly promoted, and the Laplace Hessian and inverse remain
+inside the float64 scope. Cached model arrays retain their construction
+accuracy; see [LGCP documentation](lgcp.md).
 
-```python
-import jax
-from jax_pdf import LGCP
-
-jax.config.update("jax_enable_x64", False)
-LGCP(grid_dim=1).map_estimate(max_iter=0)
-print(jax.config.x64_enabled)  # True; the caller's setting was False.
-```
-
-Follow-up: scope precision changes and preserve the caller's setting on success
-and exceptions. The new Laplace test restores the previous setting in `finally`
-to avoid contaminating the rest of the suite; that cleanup is not a production
-fix or a regression test for this issue.
+Regressions check both caller precision settings, default and float32 initial
+guesses, validation errors, result dtypes, and subsequent JAX allocations.
+The one-cell stationary-equation reference also checks converged Laplace
+results with both caller settings. Nine regressions failed before this fix.
 
 ### Passing a distribution as an unmapped `vmap` argument fails
 

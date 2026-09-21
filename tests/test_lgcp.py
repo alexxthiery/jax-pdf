@@ -24,6 +24,47 @@ def _reference_model(dist):
 
 class TestLGCP:
 
+    @pytest.mark.parametrize("enabled", [False, True], ids=["float32-caller", "float64-caller"])
+    @pytest.mark.parametrize("method", ["map_estimate", "laplace_approximation"])
+    @pytest.mark.parametrize("initial", ["default", "float32"])
+    def test_inference_preserves_precision_setting(self, enabled, method, initial):
+        """Inference needs float64 internally, without changing later JAX work.
+
+        A supplied float32 iterate must be promoted too, otherwise it retains
+        lower precision despite the float64 context. Zero iterations suffice
+        to trace the loop; the stationary-equation test checks convergence.
+        """
+        previous = jax.config.x64_enabled
+        try:
+            jax.config.update("jax_enable_x64", enabled)
+            dist = LGCP(grid_dim=1)
+            x0 = None if initial == "default" else jnp.zeros(1, dtype=jnp.float32)
+            result = getattr(dist, method)(x0=x0, max_iter=0)
+            assert jax.config.x64_enabled == enabled
+            assert jnp.ones(1).dtype == (jnp.float64 if enabled else jnp.float32)
+            if method == "map_estimate":
+                arrays = [result["x"], result["x_history"], result["loss_history"]]
+            else:
+                arrays = [result["mu"], result["precision"], result["cov"]]
+            for value in arrays:
+                assert value.dtype == np.float64
+                assert np.all(np.isfinite(np.asarray(value)))
+        finally:
+            jax.config.update("jax_enable_x64", previous)
+
+    @pytest.mark.parametrize("enabled", [False, True])
+    @pytest.mark.parametrize("method", ["map_estimate", "laplace_approximation"])
+    def test_inference_preserves_precision_after_invalid_input(self, enabled, method):
+        """An early validation error must also restore the caller's precision."""
+        previous = jax.config.x64_enabled
+        try:
+            jax.config.update("jax_enable_x64", enabled)
+            with pytest.raises(ValueError, match="x0 must have shape"):
+                getattr(LGCP(grid_dim=1), method)(x0=jnp.zeros(2), max_iter=0)
+            assert jax.config.x64_enabled == enabled
+        finally:
+            jax.config.update("jax_enable_x64", previous)
+
     @pytest.mark.parametrize("whitened", [False, True])
     def test_posterior_and_gradient_match_gaussian_poisson_model(self, whitened):
         """Finite prior-only outputs miss the entire data likelihood.
@@ -66,17 +107,18 @@ class TestLGCP:
             expected = chol.T @ expected @ chol
         np.testing.assert_allclose(dist.hessian_at(x), expected, rtol=3e-5, atol=3e-6)
 
-    def test_laplace_approximation_matches_one_cell_stationary_equation(self):
+    @pytest.mark.parametrize("enabled", [False, True])
+    def test_laplace_approximation_matches_one_cell_stationary_equation(self, enabled):
         """One cell reduces MAP to a strictly monotone scalar root.
 
         Bisection of (f-mu)/variance + exp(f) - count gives the mode
         independently of L-BFGS. Its derivative is the Laplace precision.
-        Restore the precision setting because map_estimate currently changes
-        global JAX configuration; that separate API issue is in the audit.
+        Exercise both caller precision settings; inference must keep its
+        float64 accuracy even when the caller normally uses float32.
         """
         previous_x64 = jax.config.x64_enabled
         try:
-            jax.config.update("jax_enable_x64", True)
+            jax.config.update("jax_enable_x64", enabled)
             dist = LGCP(grid_dim=1)
             count, variance = len(dist.pines_points), 1.91
             mean = math.log(126) - variance / 2
@@ -92,6 +134,7 @@ class TestLGCP:
 
             result = dist.laplace_approximation(max_iter=80, tol=1e-7)
 
+            assert jax.config.x64_enabled == enabled
             assert result["optimization"]["converged"]
             np.testing.assert_allclose(result["mu"], [mode], atol=1e-7, rtol=0)
             np.testing.assert_allclose(result["precision"], [[precision]], rtol=1e-7)

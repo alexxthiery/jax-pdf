@@ -46,7 +46,13 @@ lgcp_white = LGCP(grid_dim=40, whitened=True)
 
 ## Additional methods
 
-LGCP provides optimization utilities beyond the core interface:
+LGCP provides optimization utilities beyond the core interface.
+`map_estimate()` and `laplace_approximation()` run eagerly in scoped float64
+precision, including supplied initial guesses and the Laplace Hessian/inverse.
+They preserve the caller's JAX precision setting on both success and errors.
+Returned arrays retain their float64 dtype; subsequent JAX operations follow
+the caller's precision setting. To avoid float32 rounding in the cached GP
+covariance itself, construct `LGCP` with float64 already enabled.
 
 ```python
 # MAP estimate with optimization trajectory
