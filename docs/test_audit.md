@@ -74,24 +74,16 @@ tests were added to make them disappear. The passing suite above does not
 certify these contracts. The snippets below reproduce the issues separately;
 run the precision example in a fresh process.
 
-### Banana normalizing-constant semantics
+### Banana normalizing-constant semantics (fixed)
 
-`Banana2D.__call__` already returns a normalized density, but
-`log_normalization()` returns the additive Gaussian log constant rather than
-zero. This conflicts with the unified contract in [CONTRIBUTING](../CONTRIBUTING.md).
-A generic consumer subtracting `log_normalization()` therefore changes a
-correct normalized density into an incorrectly normalized one.
-
-```python
-from jax_pdf import Banana2D
-
-print(float(Banana2D(sigma=0.5).log_normalization()))
-# -1.1447298526763916; the normalized-density contract requires 0.
-```
-
-Follow-up: settle the public convention explicitly, then preserve the current
-density values while making the method follow that convention. Add an absolute
-normalization regression, not merely a scalar-shape or finiteness assertion.
+`Banana2D.__call__` already returned a normalized density, while
+`log_normalization()` incorrectly returned its additive Gaussian log constant.
+The method now returns zero, following the unified contract in
+[CONTRIBUTING](../CONTRIBUTING.md). The Gaussian constants remain in `__call__`,
+so density values are unchanged. Regressions at three scales check zero log Z
+under JIT and the absolute density after generic normalization. All three
+failed before the fix; existing analytic density and gradient tests protect
+against accidentally removing the constants from the density itself.
 
 ### LGCP optimization changes global JAX precision
 

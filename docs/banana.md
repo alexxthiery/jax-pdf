@@ -10,6 +10,10 @@ $$
 
 The distribution is centered around the parabola $x_1 = x_0^2$. The marginal in $x_0$ is a standard normal shifted to mean 1, while $x_1$ follows $x_0^2$ with Gaussian noise controlled by $\sigma$.
 
+`__call__` returns the normalized log density, so `log_normalization()` returns
+zero. Earlier versions returned the additive Gaussian log constant from that
+method; correcting it leaves density evaluations and sampling unchanged.
+
 ## Why it's hard
 
 The curved geometry means gradient-based samplers must follow the parabola rather than move in straight lines. Smaller $\sigma$ creates a thinner, more tightly curved banana where the sampler needs very small steps to stay on the ridge. Standard HMC with fixed step sizes wastes many proposals.

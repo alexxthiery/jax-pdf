@@ -57,17 +57,18 @@ class Banana2D:
         check_event_shape(x, (self.dim,))
         x0, x1 = x[..., 0], x[..., 1]
         quad = (x0 - 1.0) ** 2 + (x1 - x0**2) ** 2 / self.sigma**2
-        return -0.5 * quad + self.log_normalization()
+        # Include both Gaussian constants here: __call__ is normalized, so
+        # the shared log_normalization() contract requires log Z = 0.
+        log_constant = -0.5 * jnp.log(2 * jnp.pi) - 0.5 * jnp.log(2 * jnp.pi * self.sigma**2)
+        return -0.5 * quad + log_constant
 
     def log_normalization(self) -> Array:
-        """Log normalizing constant (already included in __call__).
+        """Log normalizing constant of the density returned by __call__.
 
         Returns:
-            Scalar log(Z) where Z is the normalizing constant.
+            Scalar 0.0: __call__ already includes the Gaussian constants.
         """
-        # N(x0; 1,1) contributes -0.5*log(2*pi)
-        # N(x1; x0^2, sigma^2) contributes -0.5*log(2*pi*sigma^2)
-        return -0.5 * jnp.log(2 * jnp.pi) - 0.5 * jnp.log(2 * jnp.pi * self.sigma**2)
+        return jnp.array(0.0)
 
     def sample(self, key: Array, n: int) -> Array:
         """Draw exact samples from the distribution.

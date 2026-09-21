@@ -19,6 +19,16 @@ class TestBanana2D:
         with pytest.raises(ValueError, match="sigma must be positive"):
             Banana2D(sigma=-1.0)
 
+    @pytest.mark.parametrize("sigma", [0.1, 0.5, 2.5])
+    def test_normalizing_constant_of_normalized_density_is_zero(self, sigma):
+        """Generic normalization must leave the Gaussian-factor density intact."""
+        dist = Banana2D(sigma=sigma)
+        x = jnp.array([1.0, 1.0])
+        log_z = jax.jit(lambda d: d.log_normalization())(dist)
+
+        assert float(log_z) == 0.0
+        assert float(dist(x) - log_z) == pytest.approx(-math.log(2 * math.pi * sigma))
+
     @pytest.mark.parametrize("sigma", [0.2, 1.5])
     def test_density_and_gradient_at_known_gaussian_residuals(self, sigma):
         """At x=(2, 4+sigma), both standardized residuals equal one.
