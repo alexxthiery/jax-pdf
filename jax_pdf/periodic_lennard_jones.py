@@ -7,6 +7,8 @@ soft-core / cutoff / shift conventions match ``bgmat.systems.lennard_jones``
 so that downstream flows can be compared against that reference.
 """
 
+from typing import Optional
+
 import jax
 import jax.numpy as jnp
 from flax import struct
@@ -62,7 +64,7 @@ class PeriodicLennardJones:
     beta: float = 0.5
     lambda_lj: float = 1.0
     min_distance: float = 0.0
-    linearize_below: float = None
+    linearize_below: Optional[float] = None
     shift_energy: bool = struct.field(pytree_node=False, default=True)
 
     def __post_init__(self):

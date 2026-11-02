@@ -97,7 +97,8 @@ class MyDist:
 Requirements:
 - Use `@struct.dataclass` from Flax (not `@dataclass`)
 - `__call__` returns log probability, supports batch via `x[..., i]`
-- `dim` is a property, not a method
+- `dim` is an attribute, not a method: a property derived from the structural fields,
+  or a static field where nothing derives it (`NealFunnel`)
 - Numeric parameters stay pytree children, so they can be swept with `vmap` and differentiated; sizes, flags and modes are `struct.field(pytree_node=False)`, so they stay concrete and may drive Python control flow
 - Guard validation of a numeric parameter with `is_concrete`, so the distribution can be passed through JIT and as an unmapped `vmap` argument. This skips tracers and JAX's plain object placeholders; validation of a static field needs no guard
 - Start `__call__` with `check_event_shape(x, (self.dim,))` for a generic distribution, or `check_event_shape(x, (self.n_particles, self.spatial_dim))` for a particle distribution. Check trailing axes, not total size or batch axes
@@ -106,6 +107,52 @@ Requirements:
 - `sample()` only if exact sampling is possible; omit otherwise
 - `__post_init__` validates parameters with clear error messages
 - Google-style docstrings with shape annotations
+
+#### Array parameters and alternate constructors
+
+A distribution whose parameters are arrays rather than scalars validates shapes and values
+separately, and may accept other parametrizations through classmethods:
+
+```python
+@struct.dataclass
+class MyArrayDist:
+    """One-line summary."""
+
+    means: Array                      # numeric, so a pytree child; no default
+    scale_tril: Array
+
+    def __post_init__(self):
+        # Arrays and tracers carry shapes; vmap's object placeholders carry nothing.
+        if all(type(a) is not object for a in (self.means, self.scale_tril)):
+            if jnp.ndim(self.means) != 2:
+                raise ValueError(
+                    f"MyArrayDist: means must be (n, dim), got shape "
+                    f"{jnp.shape(self.means)}."
+                )
+        # Values wait for a concrete array, as for any numeric parameter.
+        if is_concrete(self.scale_tril) and jnp.ndim(self.scale_tril) == 3:
+            if not bool(jnp.all(jnp.isfinite(self.scale_tril))):
+                raise ValueError("MyArrayDist: scale_tril is not finite. ...")
+
+    @classmethod
+    def from_covariance(cls, means, covariances) -> "MyArrayDist":
+        """Build from covariances, factorizing them once here."""
+        return cls(means=jnp.asarray(means),
+                   scale_tril=jnp.linalg.cholesky(jnp.asarray(covariances)))
+
+    @property
+    def dim(self) -> int:
+        return int(jnp.shape(self.means)[1])    # derived from a field, never stored
+```
+
+- Validate array shapes behind `type(a) is not object`, not `is_concrete`: shape metadata
+  survives tracing, so the check stays active under `jit`, and only the placeholder probe
+  has no shape to offer
+- An alternate constructor computes the declared fields and returns `cls(...)`, adding no
+  state and no branch in evaluation. That is what separates it from the factories the
+  Never list rules out
+- Put the parametrization in the name, since nothing else can say it: `from_covariance`
+  takes second moments, `scale_tril` is a Cholesky factor
 
 ### 2. Export from `jax_pdf/__init__.py`
 
@@ -189,6 +236,11 @@ Common mistakes:
 pip install -e '.[dev]'
 pytest tests/ -v
 ```
+
+On an NVIDIA GPU, add `JAX_DEFAULT_MATMUL_PRECISION=highest`. JAX computes float32
+matmuls in TF32 there by default, worth about $10^{-5}$ relative accuracy, and the
+whitened LGCP tests compare against an oracle one Cholesky matmul away, so three
+of them fail without it. CPU runs are unaffected.
 
 The suite must be self-contained: do not import sibling checkouts, modify `sys.path` to find them, or skip numerical comparisons because an external reference package is missing.
 For periodic Lennard-Jones and monatomic water, the test modules contain independent float64 scalar sums of the documented pair and triplet potentials.

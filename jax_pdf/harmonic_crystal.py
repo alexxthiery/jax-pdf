@@ -8,6 +8,8 @@ energy). With `box_length` set, displacements use the minimum-image convention
 value, exact when the wells are narrow relative to the box.
 """
 
+from typing import Optional
+
 import jax.numpy as jnp
 from flax import struct
 from jax import Array
@@ -30,7 +32,7 @@ class HarmonicCrystal:
     positions: Array
     spring_constant: float = 1.0
     beta: float = 1.0
-    box_length: float = None
+    box_length: Optional[float] = None
 
     def __post_init__(self):
         # vmap probes the pytree with object placeholders. Actual arrays and

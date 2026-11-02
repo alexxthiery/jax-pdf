@@ -153,6 +153,28 @@ class TestLGCP:
         with pytest.raises(ValueError, match="grid_dim must be positive"):
             LGCP(grid_dim=0)
 
+    def test_replacing_grid_dim_is_refused(self):
+        """Cached state is derived from grid_dim, so a stale cache must not pass.
+
+        Without the check the object reports dim 25 while holding a 9 by 9
+        factor, and the failure surfaces later as a shape error in a matmul.
+        """
+        with pytest.raises(ValueError, match="cached state is for a different grid"):
+            LGCP(grid_dim=3).replace(grid_dim=5)
+
+    def test_replacing_whitened_matches_a_fresh_build(self):
+        """The prior constant depends on `whitened`, so it must not be cached.
+
+        A cached constant leaves the replaced object off by half the log
+        determinant of the prior covariance, a silent shift of the density that
+        no shape check can detect. The oracle is a directly built instance,
+        which shares no cached state with the replaced one.
+        """
+        x = jnp.linspace(-0.4, 0.5, 9)
+        replaced = LGCP(grid_dim=3, whitened=False).replace(whitened=True)
+        fresh = LGCP(grid_dim=3, whitened=True)
+        assert float(replaced(x)) == float(fresh(x))
+
     def test_pines_points_shape(self):
         lgcp = LGCP(grid_dim=5)
         pts = lgcp.pines_points

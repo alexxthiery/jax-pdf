@@ -146,6 +146,69 @@ HarmonicCrystal positions still fail when passed through JIT.
 
 This handling follows [JAX's pytree initialization guidance](https://docs.jax.dev/en/latest/custom_pytrees.html#custom-pytrees-and-initialization-with-unexpected-values).
 
+## GaussianMixture cases (2026-11-01)
+
+`GaussianMixture` was added after the audit above, with nine cases of its own in
+`tools/audit_test_mutations.py`. All nine were detected on the first run, each by
+the oracle it was written against.
+
+| Deliberate fault | Protecting oracle |
+| --- | --- |
+| Drop `log det L_c` from a component | Component log densities against the definition in float64, with unequal correlated covariances |
+| Solve with the Cholesky factor transposed (`lower=False`) | The same component densities |
+| Remove the event-shape guard | Shared malformed-event tests, eager and JIT |
+| Normalize the weights inside `__call__` | One-dimensional quadrature of the density against `log_normalization`, plus the single-component density |
+| Form responsibilities without the weights | The posterior over components at unequal weights |
+| Treat the isotropic variance as a standard deviation | `from_isotropic_variance` against the matching scaled-identity covariance |
+| Apply the sampling scale transposed | Draws whitened back to the innovations of the second key |
+| Ignore the weights when drawing components | A zero-weight component never drawn, by the exact support rather than frequencies |
+| Drop the between-component term from `covariance` | $\mathbb{E}[xx^{\top}] - \mathbb{E}[x]\mathbb{E}[x]^{\top}$ summed over components by hand |
+
+## LGCP cache cases (2026-11-02)
+
+A design audit of the existing targets found that `LGCP` is the only distribution
+that stores derived state, and that neither half of it survives `replace`. Two
+cases cover the fixes, both detected on the first run.
+
+| Deliberate fault | Protecting oracle |
+| --- | --- |
+| Accept cached state built for a different `grid_dim` | `replace(grid_dim=...)` must raise, rather than report the new `dim` while holding the old factor |
+| Drop the determinant term from the prior constant | The unwhitened posterior and its gradient against the independently built Gaussian-Poisson model |
+
+The prior constant is no longer cached at all, because it depends on the
+`whitened` flag: a cached one left `replace(whitened=True)` short by half the log
+determinant of the prior covariance, $2.9120$ at a grid of 3, a silent shift of
+the density that no shape check can detect. Densities are bitwise unchanged for
+every directly built instance, checked at grids 1, 3, 5 and 8 in both
+parameterizations.
+
+Caveat on the baseline, corrected 2026-11-02: three whitened-LGCP cases fail on
+an NVIDIA GPU at default matmul precision,
+`test_hessian_is_prior_precision_plus_poisson_curvature[True]` and the two
+`test_distribution_as_unmapped_vmap_argument[*-LGCP1]` cases, at a relative
+difference of about $1.2 \times 10^{-5}$ against an `rtol` of
+$3 \times 10^{-6}$. The cause is TF32, not the tolerances and not the code: JAX
+runs float32 matmuls in TF32 on NVIDIA hardware by default, worth roughly
+$10^{-5}$ relative accuracy, and the whitened LGCP path sits one Cholesky matmul
+away from its oracle. All three pass with `JAX_DEFAULT_MATMUL_PRECISION=highest`,
+and all three pass on CPU. They were first read as a float32 tolerance problem of
+the code, which they are not; either way they reproduce on an unmodified checkout
+of the parent commit.
+
+The nine mixture cases were run with those three deselected, since the runner's
+baseline gate refuses to interpret mutations while any test fails; that baseline
+was green at 297 cases. On CPU no deselection is needed, because the full suite
+passes.
+
+With that baseline green and the `water_three_body_missing` spec retargeted at
+the line upstream `dc11486` had split, the complete set of 27 cases ran end to
+end for the first time on 2026-11-02, on CPU: all 27 detected, none survived.
+That run is also the first check of `lgcp_likelihood_missing`, which the baseline
+gate had been holding back.
+
+Validated with Python 3.12.14, JAX and jaxlib 0.11.2, Flax 0.12.9, NumPy 2.5.3
+and pytest 9.1.1, on CPU and on an NVIDIA RTX PRO 6000 GPU.
+
 ## Reproducing the checks
 
 From the repository root, in an environment with the project development

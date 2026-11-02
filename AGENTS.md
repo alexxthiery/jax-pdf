@@ -19,6 +19,10 @@ pip install -e '.[dev]'
 # Run all tests
 pytest tests/
 
+# On an NVIDIA GPU: TF32 matmuls cost about 1e-5 relative accuracy, which three
+# whitened-LGCP tests detect by comparing across a matmul
+JAX_DEFAULT_MATMUL_PRECISION=highest pytest tests/
+
 # Run a single test class
 pytest tests/test_banana.py -v
 ```
@@ -75,7 +79,7 @@ log_p = dist(x)                    # input (..., dim) -> output (...)
 log_p = dist(x)                    # input (..., n_particles, spatial_dim) -> output (...)
 
 # Shared across both tiers:
-dim = dist.dim                     # int property: flat DoF count
+dim = dist.dim                     # int attribute: flat DoF count
 log_Z = dist.log_normalization()   # scalar; raises NotImplementedError if intractable
 samples = dist.sample(key, n)      # (n, dim) -- Banana2D, DoubleWell, GaussianMixture, NealFunnel
 
@@ -114,6 +118,37 @@ Docs must render on GitHub. GitHub uses KaTeX, not full LaTeX.
 
 See CONTRIBUTING.md for the full list and examples.
 
+## Design principles
+
+The code conventions say how to write a distribution; these say what to build it out of.
+The library already follows them, so the named examples are the specification.
+
+- **One stored representation; derive the rest.** A field exists only when nothing else
+  determines it. `dim` is a property computed from `n_particles` and `spatial_dim`
+  (`LennardJones`), from `lattice_shape` (`LatticePhiFour`) or from `means`
+  (`GaussianMixture`), so no two fields can disagree about a size. `NealFunnel` stores
+  `dim` because nothing there derives it. `LGCP` is the one distribution that caches
+  derived state, because `__post_init__` runs on every pytree reconstruction and cannot
+  afford to rebuild a Gram factor; it pays for the cache with a consistency check, since
+  `replace(grid_dim=...)` otherwise leaves the cache describing the old grid.
+- **One evaluation path per quantity.** `GaussianMixture.sample` is
+  `sample_with_component` with the labels dropped, so draws cannot disagree with their
+  labels, and a single private helper is the only place weights are normalized. Two paths
+  to one number diverge eventually.
+- **The parameter name says whether the quantity is squared.** `sigma` is a standard
+  deviation (`Banana2D`, `NealFunnel`), `variance` is its square
+  (`cox_process_utils.exponential_kernel`), `scale_tril` and `cholesky_cov` are Cholesky
+  factors, and `from_covariance` takes second moments. Never leave this to the reader: no
+  validation can catch the confusion, since both readings are positive numbers of the same
+  shape.
+- **A mode flag validates its allowed set.** `trap_mode` (`DW4`, `LennardJones`) is static
+  so it may drive Python control flow, and `__post_init__` rejects anything outside
+  `individual` and `com`. Without that check a typo silently selects the other branch.
+- **An optional numeric field is typed `Optional[...]`.** `None` is an empty subtree to
+  JAX, so whether the field is set changes the pytree structure. `MonatomicWater` is the
+  pattern.
+- **Alternate constructors are welcome; factories are not.** See Never, below.
+
 ## Boundaries
 
 ### Always
@@ -133,5 +168,11 @@ See CONTRIBUTING.md for the full list and examples.
 
 - Rename `__call__`, turn `dim` into a method, or collapse the two tiers into one (do not "fix" particle distributions back to flat input; the structured shape is load-bearing for downstream flow consumers)
 - Add distribution-specific method names for core functionality
-- Use factories (`Dist.create(...)`) instead of direct instantiation
+- Use factories (`Dist.create(...)`) instead of direct instantiation. An alternate
+  constructor is a different thing and is welcome: a `@classmethod` that computes only
+  the declared fields from another parametrization and returns `cls(...)`, adding no
+  state, no field it alone can fill, and no branch in evaluation.
+  `PeriodicLennardJones.from_density`, `PhiFourChainOracle.from_coefficients` and
+  `GaussianMixture.from_covariance` are the examples. What this rules out is a
+  `create(mode=...)` that decides which fields exist
 - Remove or modify the Finnish pines dataset (`finpines.csv`)

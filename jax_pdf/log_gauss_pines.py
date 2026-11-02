@@ -73,14 +73,27 @@ class LGCP:
     _cholesky_cov: Array = struct.field(default=None, pytree_node=True)
     _mean: float = struct.field(default=None, pytree_node=False)
     _bin_area: float = struct.field(default=None, pytree_node=False)
-    _log_norm: float = struct.field(default=None, pytree_node=False)
+    _half_log_det: float = struct.field(default=None, pytree_node=False)
 
     def __post_init__(self):
         if self.grid_dim <= 0:
             raise ValueError(f"grid_dim must be positive, got {self.grid_dim}")
 
-        # Skip computation if already initialized (e.g., from replace())
+        # __post_init__ runs again on every pytree reconstruction, so rebuilding
+        # the Gram factor here is not affordable: cached state is kept as it is.
+        # It is derived from grid_dim, though, so replace(grid_dim=...) would
+        # otherwise leave it describing the old grid. Shape metadata survives
+        # tracing; only vmap's object placeholders have none to compare.
         if self._bin_counts is not None:
+            cached = self._cholesky_cov
+            if cached is not None and type(cached) is not object:
+                if jnp.shape(cached) != (self.dim, self.dim):
+                    raise ValueError(
+                        f"LGCP: cached state is for a different grid. grid_dim="
+                        f"{self.grid_dim} needs a {(self.dim, self.dim)} Cholesky "
+                        f"factor, got {jnp.shape(cached)}. Build LGCP(grid_dim=...) "
+                        f"directly rather than replacing grid_dim on an instance."
+                    )
             return
 
         # Load data and compute bin counts
@@ -105,26 +118,38 @@ class LGCP:
         mean = jnp.log(126.0) - 0.5 * signal_variance
         bin_area = 1.0 / (self.grid_dim ** 2)
 
-        # Prior normalization constant
-        num_latents = self.grid_dim ** 2
-        log2pi = jnp.log(2.0 * jnp.pi)
-        if self.whitened:
-            log_norm = -0.5 * num_latents * log2pi
-        else:
-            half_log_det = jnp.sum(jnp.log(jnp.abs(jnp.diag(cholesky_cov))))
-            log_norm = -0.5 * num_latents * log2pi - half_log_det
+        # Half the log determinant of the prior covariance: the only part of the
+        # prior constant that needs the Gram factor. The rest depends on
+        # `whitened`, so _prior_constant computes it per call instead. Caching a
+        # constant that a flag selects would leave replace(whitened=...) holding
+        # the other parameterization's value, a shift no shape check can detect.
+        half_log_det = jnp.sum(jnp.log(jnp.abs(jnp.diag(cholesky_cov))))
 
         # Set computed fields (frozen dataclass requires object.__setattr__)
         object.__setattr__(self, "_bin_counts", bin_counts)
         object.__setattr__(self, "_cholesky_cov", cholesky_cov)
         object.__setattr__(self, "_mean", float(mean))
         object.__setattr__(self, "_bin_area", float(bin_area))
-        object.__setattr__(self, "_log_norm", float(log_norm))
+        object.__setattr__(self, "_half_log_det", float(half_log_det))
 
     @property
     def dim(self) -> int:
         """Dimensionality of the latent field (grid_dim^2)."""
         return self.grid_dim ** 2
+
+    def _prior_constant(self) -> Array:
+        """Log normalizer of the Gaussian prior, for this parameterization.
+
+        Whitened coordinates have an identity prior covariance, so the
+        determinant term drops out; unwhitened coordinates keep it.
+
+        Returns:
+            Scalar constant added to the prior quadratic form.
+        """
+        constant = -0.5 * self.dim * jnp.log(2.0 * jnp.pi)
+        if self.whitened:
+            return constant
+        return constant - self._half_log_det
 
     @property
     def pines_points(self) -> Array:
@@ -148,11 +173,11 @@ class LGCP:
         check_event_shape(x, (self.dim,))
         if self.whitened:
             latents = cp_utils.whiten_to_latent(x, self._mean, self._cholesky_cov)
-            prior = -0.5 * jnp.sum(x ** 2, axis=-1) + self._log_norm
+            prior = -0.5 * jnp.sum(x ** 2, axis=-1) + self._prior_constant()
         else:
             latents = x
             white = cp_utils.latent_to_whiten(x, self._mean, self._cholesky_cov)
-            prior = -0.5 * jnp.sum(white ** 2, axis=-1) + self._log_norm
+            prior = -0.5 * jnp.sum(white ** 2, axis=-1) + self._prior_constant()
 
         likelihood = cp_utils.poisson_log_likelihood(
             latents, self._bin_area, self._bin_counts
