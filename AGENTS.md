@@ -27,9 +27,9 @@ pytest tests/test_banana.py -v
 
 ```
 jax_pdf/
-  __init__.py           # re-exports: Banana2D, DoubleWell, DW4, HarmonicCrystal, LatticePhiFour, LGCP,
-                        #   LennardJones, MonatomicWater, MullerBrown, NealFunnel, PeriodicLennardJones,
-                        #   PhiFour, PhiFourChainOracle
+  __init__.py           # re-exports: Banana2D, DoubleWell, DW4, GaussianMixture, HarmonicCrystal,
+                        #   LatticePhiFour, LGCP, LennardJones, MonatomicWater, MullerBrown, NealFunnel,
+                        #   PeriodicLennardJones, PhiFour, PhiFourChainOracle
   banana.py             # Banana2D distribution
   neal_funnel.py        # NealFunnel distribution
   log_gauss_pines.py    # LGCP distribution
@@ -39,6 +39,8 @@ jax_pdf/
   phi_four_oracle.py    # PhiFourChainOracle: reference values for a 1D chain by
                         #   transfer operator (NumPy; not a distribution)
   double_well.py        # DoubleWell distribution
+  gaussian_mixture.py   # GaussianMixture distribution (per-component full covariance;
+                        #   exact density, log Z, moments, responsibilities and sampler)
   dw4.py                # DW4 distribution (4-particle double-well)
   lennard_jones.py      # LennardJones distribution (LJ13, LJ55; free cluster)
   periodic_lennard_jones.py  # PeriodicLennardJones (periodic LJ solid, minimum image)
@@ -65,7 +67,8 @@ Each distribution is a `@struct.dataclass` (Flax) with a two-tier interface:
 ```python
 dist = SomeDistribution(param=value)
 
-# Generic distributions (Banana2D, NealFunnel, LGCP, MullerBrown, PhiFour, LatticePhiFour, DoubleWell):
+# Generic distributions (Banana2D, NealFunnel, GaussianMixture, LGCP, MullerBrown, PhiFour,
+# LatticePhiFour, DoubleWell):
 log_p = dist(x)                    # input (..., dim) -> output (...)
 
 # Particle distributions (LennardJones, DW4, PeriodicLennardJones, MonatomicWater, HarmonicCrystal):
@@ -74,7 +77,7 @@ log_p = dist(x)                    # input (..., n_particles, spatial_dim) -> ou
 # Shared across both tiers:
 dim = dist.dim                     # int property: flat DoF count
 log_Z = dist.log_normalization()   # scalar; raises NotImplementedError if intractable
-samples = dist.sample(key, n)      # (n, dim) -- Banana2D, DoubleWell, NealFunnel
+samples = dist.sample(key, n)      # (n, dim) -- Banana2D, DoubleWell, GaussianMixture, NealFunnel
 
 # Particle tier additionally exposes:
 n = dist.n_particles               # int

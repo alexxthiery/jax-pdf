@@ -16,7 +16,7 @@ pip install -e .
 
 All distributions share a common core API. Input shape follows a two-tier convention:
 
-- **Generic distributions** (`Banana2D`, `NealFunnel`, `LGCP`, `MullerBrown`, `PhiFour`, `LatticePhiFour`, `DoubleWell`) take flat input `(..., dim)`.
+- **Generic distributions** (`Banana2D`, `NealFunnel`, `GaussianMixture`, `LGCP`, `MullerBrown`, `PhiFour`, `LatticePhiFour`, `DoubleWell`) take flat input `(..., dim)`.
 - **Particle distributions** (`LennardJones`, `PeriodicLennardJones`, `MonatomicWater`, `HarmonicCrystal`, `DW4`) take structured input `(..., n_particles, spatial_dim)` because the particle axis is semantically meaningful and downstream consumers (normalising flows over particle systems) work in that shape natively. `dist.dim` still reports the flat DoF count (`n_particles * spatial_dim`); `n_particles` and `spatial_dim` are exposed as properties.
 
 ```python
@@ -37,7 +37,7 @@ d = dist.dim
 log_Z = dist.log_normalization()
 ```
 
-Banana2D, NealFunnel, and DoubleWell support sampling:
+Banana2D, NealFunnel, GaussianMixture, and DoubleWell support sampling:
 
 ```python
 samples = dist.sample(jax.random.PRNGKey(0), 1000)  # shape (1000, dim)
@@ -81,6 +81,7 @@ Calls that previously relied on accepting the wrong event size now raise `ValueE
 | `LatticePhiFour` | configurable | Phi-four field on a periodic lattice in any dimension, in the action's parameters (2D lattice field theory) | [docs/lattice_phi_four.md](docs/lattice_phi_four.md) |
 | `DoubleWell` | configurable | Product of 2D double-well pairs ($2^{D/2}$ modes) | [docs/double_well.md](docs/double_well.md) |
 | `DW4` | 8 | Double-well pair potential over 4 particles in 2D | [docs/dw4.md](docs/dw4.md) |
+| `GaussianMixture` | configurable | Mixture of Gaussians with per-component full covariance; density, $\log Z$, moments, responsibilities and sampler all exact | [docs/gaussian_mixture.md](docs/gaussian_mixture.md) |
 | `LennardJones` | configurable | Lennard-Jones cluster with harmonic confinement (LJ13, LJ55) | [docs/lennard_jones.md](docs/lennard_jones.md) |
 | `PeriodicLennardJones` | configurable | Lennard-Jones in a periodic box (minimum-image PBC; soft-core, cutoff, shift) | [docs/periodic_lennard_jones.md](docs/periodic_lennard_jones.md) |
 | `MonatomicWater` | configurable | Monatomic (mW) water in a periodic box (Stillinger-Weber 2-body + 3-body tetrahedral-angle term) | [docs/monatomic_water.md](docs/monatomic_water.md) |
@@ -109,10 +110,12 @@ Particle distributions (`LennardJones`, `PeriodicLennardJones`, `MonatomicWater`
 | `n_particles` | int | Number of particles. |
 | `spatial_dim` | int | Spatial dimension per particle (2 or 3). |
 
-Banana2D, NealFunnel, and DoubleWell also provide:
+Banana2D, NealFunnel, GaussianMixture, and DoubleWell also provide:
 
 | Method | Signature | Returns |
 |--------|-----------|---------|
 | `sample` | `(key, n: int) -> Array` | `n` exact samples, shape `(n, dim)`. |
+
+GaussianMixture additionally provides `component_log_prob(x)`, `log_responsibilities(x)`, `sample_with_component(key, n)`, `mean()` and `covariance()`, all exact, plus the `from_covariance`, `from_diagonal_variances` and `from_isotropic_variance` constructors. See [docs/gaussian_mixture.md](docs/gaussian_mixture.md) for details.
 
 LGCP additionally provides `map_estimate()`, `hessian_at(x)`, `laplace_approximation()`, and a `pines_points` property. See [docs/lgcp.md](docs/lgcp.md) for details.

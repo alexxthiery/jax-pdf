@@ -6,14 +6,27 @@ import numpy as np
 import pytest
 
 from jax_pdf import (
-    Banana2D, DoubleWell, DW4, HarmonicCrystal, LatticePhiFour, LGCP,
-    LennardJones, MonatomicWater, MullerBrown, NealFunnel,
-    PeriodicLennardJones, PhiFour,
+    Banana2D, DoubleWell, DW4, GaussianMixture, HarmonicCrystal,
+    LatticePhiFour, LGCP, LennardJones, MonatomicWater, MullerBrown,
+    NealFunnel, PeriodicLennardJones, PhiFour,
 )
 
 # A small crystal, spread out enough that the particle distributions below are
 # evaluated away from their singular configurations.
 CRYSTAL_POSITIONS = jnp.linspace(0.0, 2.0, 12).reshape(4, 3)
+
+# One mixture instance serves the interface, sampling and log-Z lists. Its
+# covariances are correlated and unequal, so the generic full-covariance path
+# is the one under test rather than a diagonal special case.
+GAUSSIAN_MIXTURE = GaussianMixture(
+    weights=jnp.array([0.5, 0.3, 0.2]),
+    means=jnp.array([[-1.5, 0.0, 1.0], [1.5, 1.0, -1.0], [0.0, -1.5, 0.5]]),
+    scale_tril=jnp.array([
+        [[1.0, 0.0, 0.0], [0.4, 0.9, 0.0], [-0.2, 0.3, 1.1]],
+        [[0.6, 0.0, 0.0], [-0.3, 1.2, 0.0], [0.1, 0.2, 0.7]],
+        [[1.3, 0.0, 0.0], [0.2, 0.5, 0.0], [0.4, -0.1, 0.8]],
+    ]),
+)
 
 # One representative per implementation path. Both LGCP coordinate systems and
 # PhiFour boundaries have different evaluation paths; changing only a dimension
@@ -23,6 +36,7 @@ ALL_DISTS = [
     Banana2D(sigma=0.1),
     DoubleWell(n_dims=10),
     DW4(),
+    GAUSSIAN_MIXTURE,
     NealFunnel(dim=5, sigma=3.0),
     LGCP(grid_dim=5),
     LGCP(grid_dim=5, whitened=True),
@@ -39,11 +53,13 @@ ALL_DISTS = [
 DISTS_WITH_SAMPLE = [
     Banana2D(sigma=0.1),
     DoubleWell(n_dims=4),
+    GAUSSIAN_MIXTURE,
     NealFunnel(dim=5, sigma=3.0),
 ]
 
 DISTS_WITH_LOG_NORM = [
     Banana2D(sigma=0.1),
+    GAUSSIAN_MIXTURE,
     DoubleWell(n_dims=2),
     DoubleWell(n_dims=10),
     NealFunnel(dim=5, sigma=3.0),

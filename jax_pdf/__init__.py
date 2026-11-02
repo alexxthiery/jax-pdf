@@ -3,6 +3,7 @@
 from jax_pdf.banana import Banana2D
 from jax_pdf.double_well import DoubleWell
 from jax_pdf.dw4 import DW4
+from jax_pdf.gaussian_mixture import GaussianMixture
 from jax_pdf.harmonic_crystal import HarmonicCrystal
 from jax_pdf.lattice_phi_four import LatticePhiFour
 from jax_pdf.lennard_jones import LennardJones
@@ -14,11 +15,12 @@ from jax_pdf.periodic_lennard_jones import PeriodicLennardJones
 from jax_pdf.phi_four import PhiFour
 from jax_pdf.phi_four_oracle import PhiFourChainOracle
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = [
     "Banana2D",
     "DoubleWell",
     "DW4",
+    "GaussianMixture",
     "HarmonicCrystal",
     "LatticePhiFour",
     "LGCP",
