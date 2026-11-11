@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "molecule": "ACE-L-ALA-NME",
+  "n_atoms": 22,
+  "atom_order": "openmmtools alanine-dipeptide-gbsa topology",
+  "atoms": [
+    {
+      "index": 0,
+      "name": "H1",
+      "residue": "ACE",
+      "residue_index": 0
+    },
+    {
+      "index": 1,
+      "name": "CH3",
+      "residue": "ACE",
+      "residue_index": 0
+    },
+    {
+      "index": 2,
+      "name": "H2",
+      "residue": "ACE",
+      "residue_index": 0
+    },
+    {
+      "index": 3,
+      "name": "H3",
+      "residue": "ACE",
+      "residue_index": 0
+    },
+    {
+      "index": 4,
+      "name": "C",
+      "residue": "ACE",
+      "residue_index": 0
+    },
+    {
+      "index": 5,
+      "name": "O",
+      "residue": "ACE",
+      "residue_index": 0
+    },
+    {
+      "index": 6,
+      "name": "N",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 7,
+      "name": "H",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 8,
+      "name": "CA",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 9,
+      "name": "HA",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 10,
+      "name": "CB",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 11,
+      "name": "HB1",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 12,
+      "name": "HB2",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 13,
+      "name": "HB3",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 14,
+      "name": "C",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 15,
+      "name": "O",
+      "residue": "ALA",
+      "residue_index": 1
+    },
+    {
+      "index": 16,
+      "name": "N",
+      "residue": "NME",
+      "residue_index": 2
+    },
+    {
+      "index": 17,
+      "name": "H",
+      "residue": "NME",
+      "residue_index": 2
+    },
+    {
+      "index": 18,
+      "name": "C",
+      "residue": "NME",
+      "residue_index": 2
+    },
+    {
+      "index": 19,
+      "name": "H1",
+      "residue": "NME",
+      "residue_index": 2
+    },
+    {
+      "index": 20,
+      "name": "H2",
+      "residue": "NME",
+      "residue_index": 2
+    },
+    {
+      "index": 21,
+      "name": "H3",
+      "residue": "NME",
+      "residue_index": 2
+    }
+  ],
+  "units": {
+    "positions": "nm",
+    "energy": "kJ/mol",
+    "angles": "radians"
+  },
+  "constraints": null,
+  "force_field": "AMBER parameters in the hashed openmmtools prmtop; not relabeled as ff99SB-ILDN",
+  "implicit_solvent": "OBC1",
+  "source_files_sha256": {
+    "alanine-dipeptide.prmtop": "2ce81216c7e18fd4d354fac44e22ba3843d89e297884bd6389a4cd57c74ecf6e",
+    "alanine-dipeptide.crd": "b8a151fd35b909de52b7f50b09f4a0c9fc5221d0b423c6a9ec3133bf867c4954"
+  },
+  "parameters": {
+    "vacuum": {
+      "file": "alanine_vacuum.npz",
+      "sha256": "1603030f5542efe6dd0d1a35a87a8a79c360deff432bcdf9dacaf16137ba28d3",
+      "system": "AlanineDipeptideVacuum"
+    },
+    "implicit": {
+      "file": "alanine_implicit.npz",
+      "sha256": "4e8934325b3ba346c8b7e912f1f40232900cef7351a34e5a9c5b3641597427af",
+      "system": "AlanineDipeptideImplicit"
+    }
+  },
+  "reference": {
+    "file": "alanine_reference.npz",
+    "sha256": "cc4df17e6bf3d157e9de575d5fe1886f2c2ebd62af1949d5a534d6eee488a74a",
+    "generator": "OpenMM Reference platform, original and deterministic perturbed coordinates"
+  },
+  "versions": {
+    "jax": "0.10.2",
+    "numpy": "2.5.3",
+    "openmm": "8.6.1",
+    "openmmtools": "0.26.0"
+  },
+  "jaxmm_version": "0.2.0",
+  "backend_source_sha256": {
+    "energy.py": "c7361e1e0a0078f098e7aa777b2751e63ea027d5b2cc83e920addeca68c0fa64",
+    "extract.py": "b93888d14f9c17439b3d2eee051936dbbe165f9ca5e03573250e75b15125ff7d",
+    "coordinates.py": "4a604a4d9a4fcfff807220b50553e6f63e879b23189ae5744432fd7628d48cff",
+    "internal.py": "4eaee43da59ecf5b5c8bdb4659cc26920389d2421271be9fabb410348c2b844f",
+    "utils.py": "2516d5b11eea94e0ae84b8b866c6f70e67397f295ce67f917e5cd396a95aa6b3",
+    "batching.py": "38b38c3f10152fd33b60aac53601deb99a8e8bec57b45307638a939b20302a5d",
+    "_validation.py": "83428a5642e2298a4a2bcde99ae8fba75d15edd72d90cfea4f102ee902a8392f"
+  }
+}

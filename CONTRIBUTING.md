@@ -1,5 +1,19 @@
 # Contributing
 
+## Optional chemistry targets
+
+Use the upstream `InternalCoordinates.pullback`, `map_events`, `require_float64`
+and `validate_temperature` helpers instead of copying molecular wrapper logic.
+Keep molecular physics and coordinate transformations in jaxmm; chemistry targets
+in this repository are Flax wrappers and explicit benchmark definitions.
+Import them through `jax_pdf.chemistry`, never eagerly from the package root.
+Preserve core Python >=3.9 support; chemistry requires Python >=3.10 and x64.
+Use bundled, hashed parameters and independent reference fixtures so tests need
+neither sibling repositories nor OpenMM. Setup-only regeneration may use OpenMM.
+Out-of-support internal events return `-inf` after safe input substitution;
+configuration, shape and dtype mistakes raise diagnostic errors.
+See [alanine](docs/alanine.md) for commands and the physical measure convention.
+
 ## Adding a new distribution
 
 ### 1. Create `jax_pdf/<name>.py`

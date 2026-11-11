@@ -96,6 +96,11 @@ Fixed mW constants (Molinero and Moore): $A = 7.0496$, $B = 0.6022$, $\gamma = 1
 
 ## Usage
 
+`n_neighbours` is a static structural integer: it sets the `top_k` output shape.
+Changing it may trigger JIT recompilation. Float, boolean and traced counts are
+rejected; the distribution itself can still be passed as a JIT or unmapped `vmap`
+argument. Numeric physical parameters remain pytree children.
+
 Input shape is `(..., n_particles, 3)`; `log p(x) = -beta * U(x)`.
 
 ```python

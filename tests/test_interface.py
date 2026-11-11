@@ -1,5 +1,7 @@
 """Shared interface tests for all distributions."""
 
+import os
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -46,9 +48,23 @@ ALL_DISTS = [
     PhiFour(a=0.1, b=0.0, dim_grid=10, periodic=True),
     PeriodicLennardJones(n_particles=8, box_length=4.0),
     MonatomicWater(n_particles=8, box_length=8.0),
+    MonatomicWater(n_particles=8, box_length=8.0, n_neighbours=7),
     HarmonicCrystal(positions=CRYSTAL_POSITIONS),
     LatticePhiFour(lattice_shape=(4, 4)),
 ]
+
+# Opt in so core users never need chemistry dependencies or global x64 mode.
+# This uses the same shared assertions, with a molecular rather than collinear
+# fixture. Run with JAX_ENABLE_X64=1 JAX_PDF_TEST_CHEMISTRY=1.
+_CHEMISTRY = os.environ.get("JAX_PDF_TEST_CHEMISTRY") == "1"
+if _CHEMISTRY:
+    from jax_pdf.chemistry import (
+        AlanineDipeptide, AlanineDipeptideInternal, load_alanine_parameters,
+    )
+    vacuum = AlanineDipeptide()
+    implicit = AlanineDipeptide(params=load_alanine_parameters("implicit"))
+    ALL_DISTS.extend([vacuum, implicit, AlanineDipeptideInternal(vacuum),
+                      AlanineDipeptideInternal(implicit)])
 
 DISTS_WITH_SAMPLE = [
     Banana2D(sigma=0.1),
@@ -76,6 +92,10 @@ def _test_point(dist):
     get the structured shape ``(n_particles, spatial_dim)``; flat
     distributions get ``(dim,)``.
     """
+    if _CHEMISTRY and isinstance(dist, AlanineDipeptide):
+        return dist.reference_positions
+    if _CHEMISTRY and isinstance(dist, AlanineDipeptideInternal):
+        return dist.transform.to_internal(dist.cartesian.reference_positions)
     if hasattr(dist, "n_particles") and hasattr(dist, "spatial_dim"):
         n, d = dist.n_particles, dist.spatial_dim
         return jnp.linspace(0.1, 1.0, n * d).reshape(n, d)

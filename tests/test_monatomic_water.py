@@ -355,8 +355,8 @@ class TestNeighbourList:
     at N=512 with eight configurations, so XLA refuses it outright. The list
     makes the cost ``N k**2``.
 
-    The oracle is the dense implementation itself, which ``TestBgmatDifferential``
-    locks to bgmat. The list is **exact**, not an approximation, whenever every
+    The oracle is the dense implementation itself, which ``TestScalarReference``
+    checks against independent scalar sums. The list is **exact**, not an approximation, whenever every
     particle within the three-body cutoff is in the list: triplets outside the
     cutoff contribute exactly zero to the dense sum. That condition is a
     property of the configuration, so ``max_neighbours_within_cutoff`` reports
@@ -449,3 +449,20 @@ class TestNeighbourList:
     def test_dense_is_the_default(self):
         """Opt-in: the field defaults to None, so existing callers are unchanged."""
         assert MonatomicWater(n_particles=8, box_length=6.2).n_neighbours is None
+
+    def test_neighbour_count_stays_structural_across_jit(self):
+        """A target argument must retain a concrete top-k size, not trace it.
+
+        All N-1 neighbours make the dense energy an exact numerical oracle;
+        passing the distribution as an argument exercises its reconstruction.
+        """
+        x = jnp.array([[0., 0., 0.], [2.4, 0., 0.], [0., 2.4, 0.], [0., 0., 2.4]])
+        listed = MonatomicWater(n_particles=4, box_length=8., n_neighbours=3)
+        dense = MonatomicWater(n_particles=4, box_length=8.)
+        actual = jax.jit(lambda model, point: model(point))(listed, x)
+        np.testing.assert_allclose(actual, dense(x), rtol=2e-6, atol=1e-5)
+
+    @pytest.mark.parametrize("bad", [2.5, 3.0, True, "3"])
+    def test_noninteger_neighbour_count_is_diagnostic(self, bad):
+        with pytest.raises(TypeError, match="static integer"):
+            MonatomicWater(n_particles=8, box_length=8., n_neighbours=bad)

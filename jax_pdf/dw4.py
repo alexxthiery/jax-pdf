@@ -5,6 +5,7 @@ from flax import struct
 from jax import Array
 
 from jax_pdf._validation import check_event_shape, is_concrete
+from jax_pdf._particle_utils import harmonic_trap, pair_distances
 
 
 @struct.dataclass
@@ -112,22 +113,11 @@ class DW4:
             ValueError: If the input does not have trailing shape (4, 2).
         """
         check_event_shape(x, (self.n_particles, self.spatial_dim))
-        pos = x
-
-        # Pairwise distances, unique pairs i < j
-        diff = pos[..., :, None, :] - pos[..., None, :, :]
-        r = jnp.sqrt(jnp.sum(diff**2, axis=-1) + 1e-8)
-        i, j = jnp.triu_indices(4, k=1)
-        r_pairs = r[..., i, j]
+        r_pairs = pair_distances(x)
         d = r_pairs - self.r0
         u_dw = jnp.sum(self.a * d**4 + self.b * d**2 + self.c, axis=-1)
 
-        # Harmonic trap
-        if self.trap_mode == 'individual':
-            u_trap = 0.5 * self.trap_scale * jnp.sum(pos**2, axis=(-2, -1))
-        else:  # 'com'
-            com = pos.mean(axis=-2)  # (..., 2)
-            u_trap = 0.5 * self.trap_scale * 4 * jnp.sum(com**2, axis=-1)
+        u_trap = harmonic_trap(x, self.trap_scale, self.trap_mode)
 
         return -self.beta * (u_dw + u_trap)
 

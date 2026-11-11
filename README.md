@@ -86,6 +86,15 @@ Calls that previously relied on accepting the wrong event size now raise `ValueE
 | `PeriodicLennardJones` | configurable | Lennard-Jones in a periodic box (minimum-image PBC; soft-core, cutoff, shift) | [docs/periodic_lennard_jones.md](docs/periodic_lennard_jones.md) |
 | `MonatomicWater` | configurable | Monatomic (mW) water in a periodic box (Stillinger-Weber 2-body + 3-body tetrahedral-angle term) | [docs/monatomic_water.md](docs/monatomic_water.md) |
 | `HarmonicCrystal` | configurable | Einstein/harmonic crystal with analytic free energy (Boltzmann-generator sanity oracle) | [docs/harmonic_crystal.md](docs/harmonic_crystal.md) |
+| `AlanineDipeptide` | 66 stored (63 at fixed COM) | Optional chemistry: flexible 22-atom alanine, vacuum or OBC1, Cartesian Boltzmann factor | [docs/alanine.md](docs/alanine.md) |
+| `AlanineDipeptideInternal` | 60 | Optional chemistry: same conformational ensemble in bonds, angles and periodic torsions, physical volume included | [docs/alanine.md](docs/alanine.md) |
+
+Alanine targets are explicitly imported from `jax_pdf.chemistry`, require Python
+>=3.10, `jaxmm >=0.2` and float64 mode, and are installed with
+`pip install -e '.[chemistry]'` after the corresponding backend release is available.
+For development, install the maintained `jaxmm` checkout first.
+The base package does not import or require `jaxmm`; evaluation never needs OpenMM.
+See the [chemistry setup and measure conventions](docs/alanine.md).
 
 ### Reference values
 

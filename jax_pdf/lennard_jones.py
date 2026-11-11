@@ -5,6 +5,7 @@ from flax import struct
 from jax import Array
 
 from jax_pdf._validation import check_event_shape, is_concrete
+from jax_pdf._particle_utils import harmonic_trap, pair_distances
 
 
 @struct.dataclass
@@ -118,13 +119,7 @@ class LennardJones:
         """
         n, d = self.n_particles, self.spatial_dim
         check_event_shape(x, (n, d))
-        pos = x
-
-        # Pairwise distances, unique pairs i < j
-        diff = pos[..., :, None, :] - pos[..., None, :, :]
-        r = jnp.sqrt(jnp.sum(diff**2, axis=-1) + 1e-8)
-        i, j = jnp.triu_indices(n, k=1)
-        r_pairs = r[..., i, j]
+        r_pairs = pair_distances(x)
 
         # LJ 12-6 potential
         inv_r = self.rm / r_pairs
@@ -132,12 +127,7 @@ class LennardJones:
             self.epsilon * (inv_r**12 - 2.0 * inv_r**6), axis=-1
         )
 
-        # Harmonic trap
-        if self.trap_mode == 'individual':
-            u_trap = 0.5 * self.trap_scale * jnp.sum(pos**2, axis=(-2, -1))
-        else:  # 'com'
-            com = pos.mean(axis=-2)  # (..., d)
-            u_trap = 0.5 * self.trap_scale * n * jnp.sum(com**2, axis=-1)
+        u_trap = harmonic_trap(x, self.trap_scale, self.trap_mode)
 
         return -self.beta * (u_lj + u_trap)
 

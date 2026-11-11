@@ -52,6 +52,7 @@ jax_pdf/
                         #   n_neighbours: exact O(N k^2) three-body sum for large N)
   harmonic_crystal.py   # HarmonicCrystal (Einstein crystal, exact log Z)
   cox_process_utils.py  # utility functions for LGCP
+  _particle_utils.py    # shared DW4/free-LJ pair distances and harmonic confinement
   _validation.py        # internal: event shape checks and concrete parameter validation
   finpines.csv          # Finnish pines dataset
 tests/
@@ -65,6 +66,31 @@ docs/
 ```
 
 One file per distribution. `__init__.py` re-exports the public API.
+
+### Optional chemistry
+
+`jax_pdf/chemistry/alanine.py` contains `AlanineDipeptide` (particle tier) and
+`AlanineDipeptideInternal` (generic tier). These are deliberately not re-exported
+by the root module: core import must work without jaxmm or OpenMM. The chemistry
+extra requires jaxmm >=0.2 and Python >=3.10; float64 is explicit caller setup.
+Molecular physics, geometry, support and physical volume factors belong in jaxmm.
+The wrappers own Flax/JAX integration, event shapes and benchmark defaults.
+Use `transform.pullback(cartesian_target, q, reference=q0)` rather than reimplement
+energy, support, reconstruction or Jacobians. Use upstream `map_events`,
+`require_float64` and `validate_temperature` rather than copying their logic.
+Internal state contains only the shared Cartesian target; its transform is derived.
+The physical internal measure includes all radial/angular factors, not the flat
+fixed-frame slice determinant. Cartesian sampling fixes COM; evaluation is the
+unconfined Boltzmann factor. Never silently recenter inputs or add a trap.
+
+`tools/build_alanine_assets.py` rebuilds local parameter files, independent OpenMM
+references and provenance under `jax_pdf/chemistry/data/`. Runtime verifies hashes;
+never generate data, run MD or download assets during target construction.
+`tests/test_alanine.py` is optional and self-contained once jaxmm is installed.
+Run `JAX_ENABLE_X64=1 JAX_PDF_TEST_CHEMISTRY=1 pytest tests/test_interface.py` to
+exercise chemistry in the existing shared interface matrix. Use valid molecular
+reference points there, not the generic collinear particle fixture.
+See `docs/alanine.md` for support, chirality, units, regeneration and migration.
 
 Each distribution is a `@struct.dataclass` (Flax) with a two-tier interface:
 

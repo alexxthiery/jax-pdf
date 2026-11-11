@@ -8,6 +8,7 @@ vectorized energy and its derivatives with independent scalar pair/triplet
 sums and analytic configurations; no external reference package is required.
 """
 import math
+from numbers import Integral
 from typing import Optional
 
 import jax
@@ -56,7 +57,8 @@ class MonatomicWater:
             configuration, and the choice is the caller's. Needed above a few
             hundred particles: the dense tensor asks XLA for 4.3 GB at N=512 with
             eight configurations. The two-body sum stays dense (``O(N**2)``).
-            Default None (dense).
+            Structural and static under JAX; must be an integer, not a traced
+            numeric parameter. Default None (dense).
     """
 
     n_particles: int = struct.field(pytree_node=False)
@@ -65,7 +67,7 @@ class MonatomicWater:
     min_distance: float = 0.0
     spatial_dim: int = struct.field(pytree_node=False, default=3)
     linearize_below: Optional[float] = None
-    n_neighbours: Optional[int] = None
+    n_neighbours: Optional[int] = struct.field(pytree_node=False, default=None)
 
     def __post_init__(self):
         if (self.linearize_below is not None and is_concrete(self.linearize_below)
@@ -73,6 +75,9 @@ class MonatomicWater:
             raise ValueError(
                 f"linearize_below must be positive or None, got {self.linearize_below}"
             )
+        if self.n_neighbours is not None and (
+                isinstance(self.n_neighbours, bool) or not isinstance(self.n_neighbours, Integral)):
+            raise TypeError(f"n_neighbours must be a static integer or None, got {self.n_neighbours!r}")
         if self.n_neighbours is not None and not 2 <= self.n_neighbours <= self.n_particles - 1:
             # Two neighbours are the smallest triplet; N-1 is all of them.
             raise ValueError(
