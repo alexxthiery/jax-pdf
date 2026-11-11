@@ -21,13 +21,30 @@ except ImportError:
     from jax.experimental import enable_x64
 
 
-@pytest.fixture(autouse=True)
+# Reuse compiled functions across cases. Capturing a fresh target in a new
+# lambda recompiles the same molecular graph for every assertion.
+@jax.jit
+def _call(dist, x):
+    return dist(x)
+
+
+@jax.jit
+def _evaluate(dist, points):
+    return jax.vmap(jax.value_and_grad(lambda x: dist(x)))(points)
+
+
+@jax.jit
+def _to_internal(transform, x):
+    return transform.to_internal(x)
+
+
+@pytest.fixture(scope="module", autouse=True)
 def precision():
     with enable_x64():
         yield
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def references():
     with np.load(alanine._asset("reference"), allow_pickle=False) as data:
         return {name: data[name] for name in data.files}
@@ -44,8 +61,9 @@ def test_energy_and_force_against_openmm_assets(solvent, references):
     """
     dist = AlanineDipeptide(params=load_alanine_parameters(solvent), temperature=427.)
     x = jnp.asarray(references["positions"])
-    energy = -dist(x)*0.008314462618*427.
-    forces = jax.vmap(jax.grad(dist))(x)*0.008314462618*427.
+    values, gradients = _evaluate(dist, x)
+    energy = -values*0.008314462618*427.
+    forces = gradients*0.008314462618*427.
     np.testing.assert_allclose(energy, references[f"{solvent}_energies"], rtol=0, atol=2e-5)
     np.testing.assert_allclose(forces, references[f"{solvent}_forces"], rtol=0, atol=0.01)
 
@@ -55,27 +73,30 @@ def test_internal_density_matches_cartesian_conformational_law(references):
     cartesian = AlanineDipeptide(temperature=381.)
     internal = AlanineDipeptideInternal(cartesian)
     x = jnp.asarray(references["positions"])
-    q = internal.transform.to_internal(x)
+    q = _to_internal(internal.transform, x)
     bonds, angles, _ = internal.transform.unpack(q)
     # The full-volume identity is independently proved upstream using a square
     # Cartesian Jacobian including pose. This integration check pins the choice
     # of that measure and its sign in the wrapper, rather than the slice measure.
-    expected = cartesian(x) + 2*jnp.log(bonds).sum(-1) + jnp.log(jnp.sin(angles)).sum(-1)
-    np.testing.assert_allclose(jax.jit(lambda d,y:d(y))(internal,q), expected, atol=1e-8, rtol=0)
+    expected = _call(cartesian, x) + 2*jnp.log(bonds).sum(-1) + jnp.log(jnp.sin(angles)).sum(-1)
+    np.testing.assert_allclose(_call(internal, q), expected, atol=1e-8, rtol=0)
     np.testing.assert_allclose(jax.grad(lambda t: internal.replace(
         cartesian=cartesian.replace(temperature=t))(q[0]))(381.),
         -cartesian(x[0])/381., rtol=1e-10)
 
 
-@pytest.mark.parametrize("index,value", [(0, 0.), (5, -.1), (21, 0.), (22, np.pi),
-                                         (41, np.pi), (43, np.nan), (0, np.inf)])
-def test_rejected_events_have_zero_gradient(index, value):
+def test_rejected_events_have_zero_gradient():
+    """One mixed batch covers every boundary without seven recompilations."""
     internal = AlanineDipeptideInternal()
-    q = internal.transform.to_internal(internal.cartesian.reference_positions)
-    bad = q.at[index].set(value)
-    value, gradient = jax.jit(jax.value_and_grad(internal))(bad)
-    assert value == -jnp.inf
-    np.testing.assert_array_equal(gradient, jnp.zeros(60))
+    q = _to_internal(internal.transform, internal.cartesian.reference_positions)
+    violations = [(0, 0.), (5, -.1), (21, 0.), (22, np.pi),
+                  (41, np.pi), (43, np.nan), (0, np.inf)]
+    points = jnp.stack([q] + [q.at[index].set(value) for index, value in violations])
+    values, gradients = _evaluate(internal, points)
+    np.testing.assert_allclose(values[0], _call(internal, q), atol=1e-8)
+    assert jnp.all(jnp.isfinite(gradients[0]))
+    np.testing.assert_array_equal(values[1:], jnp.full(len(violations), -jnp.inf))
+    np.testing.assert_array_equal(gradients[1:], jnp.zeros_like(points[1:]))
 
 
 def test_chirality_is_the_same_support_in_both_representations():
@@ -83,16 +104,16 @@ def test_chirality_is_the_same_support_in_both_representations():
     internal = AlanineDipeptideInternal(cartesian)
     x = cartesian.reference_positions
     mirror = x*jnp.array([1., 1., -1.])
-    q = internal.transform.to_internal(mirror)
-    assert cartesian(mirror) == -jnp.inf
-    assert internal(q) == -jnp.inf
-    np.testing.assert_array_equal(jax.grad(internal)(q), jnp.zeros_like(q))
+    q = _to_internal(internal.transform, mirror)
+    assert _call(cartesian, mirror) == -jnp.inf
+    assert _call(internal, q) == -jnp.inf
+    np.testing.assert_array_equal(_evaluate(internal, q[None, :])[1][0], jnp.zeros_like(q))
     free = cartesian.replace(chirality="unrestricted")
     # The actual AMBER phase constants need not be exactly reflection symmetric.
     # Removing the support restriction must admit the mirrored event unchanged.
-    assert jnp.isfinite(free(mirror))
-    np.testing.assert_allclose(AlanineDipeptideInternal(free)(q),
-                               free(mirror)+internal.transform.log_volume(q), atol=1e-8, rtol=0)
+    assert jnp.isfinite(_call(free, mirror))
+    np.testing.assert_allclose(_call(AlanineDipeptideInternal(free), q),
+                               _call(free, mirror)+internal.transform.log_volume(q), atol=1e-8, rtol=0)
     with pytest.raises(ValueError, match="chirality"):
         cartesian.replace(chirality="left")
 

@@ -29,7 +29,10 @@ class TestHarmonicCrystal:
         s = jnp.zeros((1, 1))
         for beta, k in [(1.0, 1.0), (2.0, 3.0)]:
             hc = HarmonicCrystal(positions=s, spring_constant=k, beta=beta)
-            u = jnp.linspace(-15.0, 15.0, 300_001)
+            # The narrowest Gaussian has sigma=1/sqrt(6): this grid has
+            # >14 points per sigma, with tails beyond 15 sigma. Discretization
+            # and truncation errors are below the float32 tolerance.
+            u = jnp.linspace(-15.0, 15.0, 1025)
             integral = jnp.trapezoid(jnp.exp(-beta * 0.5 * k * u**2), u)
             assert jnp.allclose(
                 hc.log_normalization(), float(jnp.log(integral)), atol=1e-4

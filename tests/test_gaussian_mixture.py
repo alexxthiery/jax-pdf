@@ -110,7 +110,9 @@ class TestNormalization:
     def test_density_integrates_to_the_total_weight(self):
         """Quadrature in one dimension ties __call__ to log_normalization."""
         line = GaussianMixture.from_isotropic_variance([0.7, 0.4], [[-1.5], [2.0]], 0.5)
-        grid = jnp.linspace(-12.0, 12.0, 200_001)
+        # Step < sigma/100; the nearest boundary is >14 sigma from
+        # either mean. More nodes only repeat float32 rounding error.
+        grid = jnp.linspace(-12.0, 12.0, 4097)
         integral = jnp.trapezoid(jnp.exp(line(grid[:, None])), grid)
         assert float(jnp.log(integral)) == pytest.approx(float(line.log_normalization()),
                                                          abs=1e-5)

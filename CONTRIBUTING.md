@@ -275,6 +275,13 @@ keep statistical validation in a separate, explicitly run experiment. Small
 seeded fixtures and real-RNG shape/support checks are fine when their assertions
 do not depend on sampling error. Do not freeze a particular PRNG output stream.
 
+Keep fixtures as small as the claim permits. Reuse module-level compiled helpers
+when the same JAX operation is exercised across cases; a fresh jitted lambda has
+a separate compilation cache. Batch related invalid events with a valid control
+when this preserves diagnostic assertions. Keep independent force and Jacobian
+oracles even when they are expensive. Profile with `pytest tests/ --durations=20`
+before removing coverage or adding performance machinery.
+
 The [test effectiveness audit](docs/test_audit.md) records demonstrated gaps,
 the tests that close them, and the subsequent API fixes. Run the focused mutation
 audit after changing these numerical contracts:

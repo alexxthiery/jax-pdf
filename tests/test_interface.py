@@ -13,6 +13,16 @@ from jax_pdf import (
     NealFunnel, PeriodicLennardJones, PhiFour,
 )
 
+# One cache per operation, rather than a fresh jitted lambda per test instance.
+def _call(dist, x):
+    return dist(x)
+
+
+_jitted_call = jax.jit(_call)
+_mapped_call = jax.vmap(_call, in_axes=(None, 0))
+_jitted_mapped_call = jax.jit(_mapped_call)
+
+
 # A small crystal, spread out enough that the particle distributions below are
 # evaluated away from their singular configurations.
 CRYSTAL_POSITIONS = jnp.linspace(0.0, 2.0, 12).reshape(4, 3)
@@ -131,7 +141,7 @@ class TestInterface:
         Oracle: the same call with the distribution captured by closure.
         """
         x = _test_point(dist)
-        traced = jax.jit(lambda d, y: d(y))(dist, x)
+        traced = _jitted_call(dist, x)
         assert jnp.allclose(traced, dist(x), rtol=1e-6)
 
     @pytest.mark.parametrize("compiled", [False, True], ids=["vmap", "jit-vmap"])
@@ -144,9 +154,7 @@ class TestInterface:
         """
         x = _test_point(dist)
         points = jnp.stack([x, x * 1.1])
-        evaluate = jax.vmap(lambda d, y: d(y), in_axes=(None, 0))
-        if compiled:
-            evaluate = jax.jit(evaluate)
+        evaluate = _jitted_mapped_call if compiled else _mapped_call
         actual = evaluate(dist, points)
         expected = jnp.stack([dist(point) for point in points])
         np.testing.assert_allclose(actual, expected, rtol=3e-6, atol=2e-5)
@@ -168,7 +176,7 @@ class TestInterface:
             "layout": ((dist.dim,) if len(event_shape) == 2 else (dist.dim, 1)),
         }
         x = jnp.zeros(shapes[invalid])
-        call = jax.jit(lambda d, y: d(y)) if compiled else lambda d, y: d(y)
+        call = _jitted_call if compiled else _call
 
         with pytest.raises(ValueError) as error:
             call(dist, x)
@@ -184,7 +192,7 @@ class TestInterface:
         x = _test_point(dist)
         batch = jnp.broadcast_to(x, batch_shape + x.shape)
 
-        actual = jax.jit(lambda d, y: d(y))(dist, batch)
+        actual = _jitted_call(dist, batch)
 
         assert actual.shape == batch_shape
         np.testing.assert_allclose(actual, jnp.broadcast_to(dist(x), batch_shape),
@@ -208,7 +216,7 @@ def test_particle_count_is_checked_separately(dist):
     """A valid spatial dimension does not excuse a wrong particle count."""
     x = jnp.zeros((dist.n_particles + 1, dist.spatial_dim))
     with pytest.raises(ValueError, match="[Ee]xpected"):
-        jax.jit(lambda d, y: d(y))(dist, x)
+        _jitted_call(dist, x)
 
 
 @pytest.mark.parametrize(
@@ -226,12 +234,8 @@ class TestLogNormalization:
 @pytest.mark.parametrize("dist", DISTS_WITH_SAMPLE, ids=lambda d: type(d).__name__)
 class TestSample:
 
-    def test_sample_shape(self, dist):
-        key = jax.random.PRNGKey(0)
-        samples = dist.sample(key, 100)
-        assert samples.shape == (100, dist.dim)
-
-    def test_sample_finite(self, dist):
-        key = jax.random.PRNGKey(42)
-        samples = dist.sample(key, 50)
+    def test_sample_shape_and_finite(self, dist):
+        """Small real-RNG integration check; sampler laws have separate oracles."""
+        samples = dist.sample(jax.random.PRNGKey(0), 8)
+        assert samples.shape == (8, dist.dim)
         assert jnp.all(jnp.isfinite(samples))
