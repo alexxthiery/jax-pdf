@@ -19,7 +19,7 @@ with standard coefficients from Muller and Brown (1979):
 | 3   | $-170$ | $-6.5$ | $11$   | $-6.5$ | $-0.5$   | $1.5$    |
 | 4   | $15$   | $0.7$  | $0.6$  | $0.7$  | $-1$     | $1$      |
 
-![Muller-Brown potential energy surface](../examples/muller_brown_potential.png)
+![Muller-Brown potential energy surface](../examples/muller_brown/muller_brown_potential.png)
 
 ## Why it's hard
 

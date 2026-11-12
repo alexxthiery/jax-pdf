@@ -20,8 +20,10 @@ This sweep reports, for each (u, kappa, n_sites) at h = 0 and a = 1:
 Everything but the last three is exact. Those three come from exact draws of
 the discretized chain, so they carry Monte Carlo error, reported alongside.
 
-Run: python examples/phi_four_hardness.py
+Run: python examples/phi_four/phi_four_hardness.py
 """
+
+from pathlib import Path
 
 import numpy as np
 
@@ -78,8 +80,9 @@ def figure(rows, rng):
     axes[1].set(xscale="log", xlabel="n / xi", ylabel="Binder cumulant",
                 title="Order is set by n / xi, not by the barrier (dashed: 2/3)")
     fig.tight_layout()
-    fig.savefig("examples/phi_four_hardness.png", dpi=200)
-    print("\nSaved examples/phi_four_hardness.png")
+    output_path = Path(__file__).with_name("phi_four_hardness.png")
+    fig.savefig(output_path, dpi=200)
+    print(f"\nSaved {output_path}")
 
 
 def main():

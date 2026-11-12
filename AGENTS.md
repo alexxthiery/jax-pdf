@@ -202,3 +202,12 @@ The library already follows them, so the named examples are the specification.
   `GaussianMixture.from_covariance` are the examples. What this rules out is a
   `create(mode=...)` that decides which fields exist
 - Remove or modify the Finnish pines dataset (`finpines.csv`)
+
+## Offline evaluation
+
+`jax_pdf.evaluation` contains small NumPy array comparisons (category frequencies,
+periodic two-angle histograms, JS divergence and empirical 1D Wasserstein). It
+imports neither chemistry nor samplers and is not re-exported from the root.
+Keep array validation explicit and protect numerical behavior with tiny exact
+fixtures. No downloads, Monte Carlo assertions, dataset registry or convergence
+claims belong here. See `docs/evaluation.md`.

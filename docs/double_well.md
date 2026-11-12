@@ -17,7 +17,7 @@ $$
 \log p(x) = \sum_{i=0}^{D/2-1} \left[-x_{2i}^4 + 6 x_{2i}^2 + 0.5 x_{2i} - 0.5 x_{2i+1}^2\right]
 $$
 
-![Double-well log-density (2D)](../examples/double_well_density.png)
+![Double-well log-density (2D)](../examples/double_well/double_well_density.png)
 
 ## Why it's hard
 

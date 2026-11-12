@@ -12,6 +12,8 @@ cd jax-pdf
 pip install -e .
 ```
 
+See the [examples](examples/README.md) for runnable scripts and a notebook.
+
 ## Unified interface
 
 All distributions share a common core API. Input shape follows a two-tier convention:
@@ -100,7 +102,7 @@ See the [chemistry setup and measure conventions](docs/alanine.md).
 
 `PhiFourChainOracle` solves a one-dimensional phi-four chain by transfer operator, giving `log Z`, site marginals, two-point functions and exact draws with no Monte Carlo ([docs/phi_four_oracle.md](docs/phi_four_oracle.md)).
 It is the ground truth a sampler study needs while developing, before moving to a lattice where none is available.
-`examples/phi_four_hardness.py` uses it to map where a chain is genuinely two-moded: in one dimension that is decided by the chain length against the correlation length, not by the barrier height.
+`examples/phi_four/phi_four_hardness.py` uses it to map where a chain is genuinely two-moded: in one dimension that is decided by the chain length against the correlation length, not by the barrier height.
 
 ## API reference
 
@@ -128,3 +130,7 @@ Banana2D, NealFunnel, GaussianMixture, and DoubleWell also provide:
 GaussianMixture additionally provides `component_log_prob(x)`, `log_responsibilities(x)`, `sample_with_component(key, n)`, `mean()` and `covariance()`, all exact, plus the `from_covariance`, `from_diagonal_variances` and `from_isotropic_variance` constructors. See [docs/gaussian_mixture.md](docs/gaussian_mixture.md) for details.
 
 LGCP additionally provides `map_estimate()`, `hessian_at(x)`, `laplace_approximation()`, and a `pines_points` property. See [docs/lgcp.md](docs/lgcp.md) for details.
+
+Saved samples can be compared with small, explicitly imported NumPy functions
+from `jax_pdf.evaluation`; see [offline evaluation](docs/evaluation.md).
+These functions introduce no reference-data or sampler dependency.

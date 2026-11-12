@@ -70,7 +70,7 @@ mu, cov = laplace["mu"], laplace["cov"]
 
 ## MAP estimate visualization
 
-![MAP estimate of the log-intensity field](../examples/log_gaussian_pine_map_estimate.png)
+![MAP estimate of the log-intensity field](../examples/lgcp/log_gaussian_pine_map_estimate.png)
 
 ## References
 

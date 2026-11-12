@@ -1,5 +1,7 @@
 """Plot the 2D double-well log-density."""
 
+from pathlib import Path
+
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,5 +30,6 @@ ax.set_title("Double-well log-density (2D)")
 ax.set_aspect("equal")
 
 fig.tight_layout()
-fig.savefig("examples/double_well_density.png", dpi=300)
-print("Saved examples/double_well_density.png")
+output_path = Path(__file__).with_name("double_well_density.png")
+fig.savefig(output_path, dpi=300)
+print(f"Saved {output_path}")

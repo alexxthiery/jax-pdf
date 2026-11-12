@@ -111,7 +111,7 @@ A phi-four chain is not automatically a two-moded target, and the barrier does n
 In one dimension a domain wall costs a finite amount, so a chain much longer than the correlation length $\xi$ breaks into domains and its magnetization concentrates near zero; a chain shorter than $\xi$ behaves as one domain and its magnetization is bimodal.
 What matters is $n/\xi$, and `correlation_length()` gives $\xi$ exactly from the transfer spectrum.
 
-`examples/phi_four_hardness.py` sweeps $u$, $\kappa$ and $n$ at $a = 1$, $h = 0$ and reports $\xi$, $n/\xi$, the uniform-path barrier, and the magnetization's spread, tail mass and Binder cumulant from exact draws.
+`examples/phi_four/phi_four_hardness.py` sweeps $u$, $\kappa$ and $n$ at $a = 1$, $h = 0$ and reports $\xi$, $n/\xi$, the uniform-path barrier, and the magnetization's spread, tail mass and Binder cumulant from exact draws.
 Two rows from it, both on 64 sites:
 
 | $u$ | $\kappa$ | $\xi$ | $n/\xi$ | barrier | $P(\lvert m \rvert > 1/2)$ | Binder |

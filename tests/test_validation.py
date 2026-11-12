@@ -51,7 +51,8 @@ def test_export_accepts_symbolic_batch_size_with_fixed_event_size():
     exported = export.export(jax.jit(lambda x: dist(x)))(spec)
 
     for batch_size in (1, 3):
-        actual = exported.call(jnp.ones((batch_size, 10)))
+        # Match the export contract independently of the caller's x64 setting.
+        actual = exported.call(jnp.ones((batch_size, 10), dtype=spec.dtype))
         assert actual.shape == (batch_size,)
         assert jnp.all(actual == 25.0)
 

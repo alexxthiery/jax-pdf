@@ -1,5 +1,7 @@
 """Plot the Muller-Brown potential energy surface."""
 
+from pathlib import Path
+
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,5 +32,6 @@ ax.set_ylabel("y")
 ax.set_title("Muller-Brown potential")
 
 fig.tight_layout()
-fig.savefig("examples/muller_brown_potential.png", dpi=300)
-print("Saved examples/muller_brown_potential.png")
+output_path = Path(__file__).with_name("muller_brown_potential.png")
+fig.savefig(output_path, dpi=300)
+print(f"Saved {output_path}")
